@@ -76,6 +76,8 @@ void ffm_save_model_c_string(ffm_model &model, char *path);
 
 ffm_problem ffm_convert_data(ffm_line *data, ffm_int num_lines);
 
+void ffm_cleanup_data(ffm_problem *p);
+
 ffm_model ffm_init_model(ffm_problem &data, ffm_parameter params);
 
 ffm_float ffm_train_iteration(ffm_problem &data, ffm_model &model, ffm_parameter params);
@@ -83,6 +85,8 @@ ffm_float ffm_train_iteration(ffm_problem &data, ffm_model &model, ffm_parameter
 ffm_float ffm_predict_array(ffm_node *nodes, int len, ffm_model &model);
 
 ffm_float* ffm_predict_batch(ffm_problem &data, ffm_model &model);
+
+void ffm_cleanup_prediction(ffm_float* f);
 
 } // namespace ffm
 

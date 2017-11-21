@@ -743,6 +743,7 @@ ffm_float ffm_train_iteration(ffm_problem& prob, ffm_model& model, ffm_parameter
         wTx(begin, end, r, model, kappa, params.eta, params.lambda, true);
     }
 
+    delete [] idx;
     return loss / len;
 }
 
@@ -840,6 +841,17 @@ ffm_float ffm_predict_array(ffm_node* nodes, int len, ffm_model &model) {
     ffm_node* end = begin + len;
 
     return ffm_predict(begin, end, model);
+}
+
+void ffm_cleanup_prediction(ffm_float* f) {
+    delete [] f;
+}
+
+void ffm_cleanup_data(ffm_problem *p) {
+    delete [] p->data;
+    delete [] p->pos;
+    delete [] p->labels;
+    delete [] p->scales;
 }
 
 } // namespace ffm
