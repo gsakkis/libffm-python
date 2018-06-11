@@ -21,7 +21,7 @@ ffm-predict: ffm-predict.cpp ffm.o timer.o
 ffm.o: ffm.cpp ffm.h timer.o
 	$(CXX) $(CXXFLAGS) $(DFLAG) -c -o $@ $<
 
-libffm.so: ffm.cpp ffm.h timer.o
+libffm.so: ffm-wrapper.cpp ffm-wrapper.h ffm.cpp ffm.h timer.o
 	$(CXX) -shared $(CXXFLAGS) $(DFLAG) -o $@ -fPIC timer.o $<
 
 timer.o: timer.cpp timer.h

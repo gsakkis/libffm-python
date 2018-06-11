@@ -3,8 +3,6 @@
 
 #include <string>
 
-extern "C" {
-
 namespace ffm {
 
 using namespace std;
@@ -48,47 +46,6 @@ ffm_model ffm_train_on_disk(string Tr_path, string Va_path, ffm_parameter param)
 
 ffm_float ffm_predict(ffm_node *begin, ffm_node *end, ffm_model &model);
 
-
-// new structs and methods for the wrapper
-
-struct ffm_line {
-    ffm_node* data;
-    ffm_float label;
-    ffm_int size;
-};
-
-struct ffm_problem {
-    ffm_int size = 0;
-    ffm_long num_nodes = 0;
-
-    ffm_node* data;
-    ffm_long* pos;
-    ffm_float* labels;
-    ffm_float* scales;
-
-    ffm_int n = 0;
-    ffm_int m = 0;
-};
-
-ffm_model ffm_load_model_c_string(char *path);
-
-void ffm_save_model_c_string(ffm_model &model, char *path);
-
-ffm_problem ffm_convert_data(ffm_line *data, ffm_int num_lines);
-
-void ffm_cleanup_data(ffm_problem *p);
-
-ffm_model ffm_init_model(ffm_problem &data, ffm_parameter params);
-
-ffm_float ffm_train_iteration(ffm_problem &data, ffm_model &model, ffm_parameter params);
-
-ffm_float ffm_predict_array(ffm_node *nodes, int len, ffm_model &model);
-
-ffm_float* ffm_predict_batch(ffm_problem &data, ffm_model &model);
-
-void ffm_cleanup_prediction(ffm_float* f);
-
 } // namespace ffm
 
 #endif // _LIBFFM_H
-}
