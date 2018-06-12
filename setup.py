@@ -1,21 +1,36 @@
-from setuptools import setup
+import sys
+from setuptools import setup, Extension
 
-# Please use setup_pip.py for generating and deploying pip installation
-# detailed instruction in setup_pip.py
-setup(name='ffm',
-      version='7e8621d',
-      description="LibFFM Python Package",
-      long_description="LibFFM Python Package",
-      install_requires=[
-          'numpy',
-      ],
-      maintainer='',
-      maintainer_email='',
-      zip_safe=False,
-      packages=['ffm'],
-      package_data={'ffm': ['libffm.so']},
-      include_package_data=True,
-      license='BSD 3-clause',
-      classifiers=['License :: OSI Approved :: BSD 3-clause'],
-      url='https://github.com/alexeygrigorev/libffm-python'
+USEOMP = True
+USESSE = True
+
+extra_compile_args = ['-O3', '-std=c++0x', '-march=native']
+extra_link_args = []
+if USEOMP:
+    extra_compile_args.extend(['-fopenmp', '-DUSEOMP'])
+    extra_link_args.append('-fopenmp')
+if USESSE:
+    extra_compile_args.append('-DUSESSE')
+if sys.platform.startswith('win32'):
+    extra_compile_args.append('-D_WIN32')
+
+setup(
+    name='ffm',
+    version='0.1',
+    description='Python wrapper for LibFFM',
+    url='https://github.com/gsakkis/libffm-python',
+    packages=['ffm'],
+    ext_modules=[
+        Extension(
+            name='ffm._libffm',
+            sources=['ffm/ffm-wrapper.cpp', 'libffm/timer.cpp'],
+            include_dirs=['libffm'],
+            extra_compile_args=extra_compile_args,
+            extra_link_args=extra_link_args,
+        )
+    ],
+    zip_safe=False,
+    install_requires=['numpy'],
+    license='BSD',
+    classifiers=['License :: OSI Approved :: BSD License'],
 )

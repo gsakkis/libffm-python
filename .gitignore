@@ -1,5 +1,3 @@
-libffm.so
-
 # python artifacts
 __pycache__/
 ffm.egg-info/
