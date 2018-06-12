@@ -1,5 +1,4 @@
 CXX = g++
-#CXXFLAGS = -Wall -O3 -std=c++0x -march=native -g -O0 
 CXXFLAGS = -Wall -O3 -std=c++0x -march=native
 
 # comment the following flags if you do not want to SSE instructions
@@ -9,8 +8,7 @@ DFLAG += -DUSESSE
 DFLAG += -DUSEOMP
 CXXFLAGS += -fopenmp
 
-all: ffm-train ffm-predict
-so: libffm.so
+all: ffm-train ffm-predict libffm.so
 
 ffm-train: ffm-train.cpp ffm.o timer.o
 	$(CXX) $(CXXFLAGS) $(DFLAG) -o $@ $^
@@ -27,6 +25,5 @@ libffm.so: ffm-wrapper.cpp ffm-wrapper.h ffm.cpp ffm.h timer.o
 timer.o: timer.cpp timer.h
 	$(CXX) $(CXXFLAGS) $(DFLAG) -fPIC -c -o $@ $<
 
-
 clean:
-	rm -f ffm-train ffm-predict ffm.o timer.o libffm.so
+	rm -rf ffm-train ffm-predict *.o libffm.so build/ dist/ ffm.egg-info/
