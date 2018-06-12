@@ -21,7 +21,7 @@ v: Value of each element in the problem
 #endif
 
 #include "ffm-wrapper.h"
-#include "ffm.cpp"
+#include "libffm/ffm.cpp"
 
 namespace ffm {
 

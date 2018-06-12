@@ -1,7 +1,7 @@
-ffm-train
-ffm-predict
 libffm.so
-*.o
+
+# python artifacts
+__pycache__/
 ffm.egg-info/
 build/
 dist/

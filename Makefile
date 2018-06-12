@@ -1,3 +1,5 @@
+.PHONY: all libffm clean
+
 CXX = g++
 CXXFLAGS = -Wall -O3 -std=c++0x -march=native
 
@@ -8,22 +10,14 @@ DFLAG += -DUSESSE
 DFLAG += -DUSEOMP
 CXXFLAGS += -fopenmp
 
-all: ffm-train ffm-predict libffm.so
+all: libffm ffm/libffm.so
 
-ffm-train: ffm-train.cpp ffm.o timer.o
-	$(CXX) $(CXXFLAGS) $(DFLAG) -o $@ $^
+libffm:
+	$(MAKE) -C libffm
 
-ffm-predict: ffm-predict.cpp ffm.o timer.o
-	$(CXX) $(CXXFLAGS) $(DFLAG) -o $@ $^
-
-ffm.o: ffm.cpp ffm.h timer.o
-	$(CXX) $(CXXFLAGS) $(DFLAG) -c -o $@ $<
-
-libffm.so: ffm-wrapper.cpp ffm-wrapper.h ffm.cpp ffm.h timer.o
-	$(CXX) -shared $(CXXFLAGS) $(DFLAG) -o $@ -fPIC timer.o $<
-
-timer.o: timer.cpp timer.h
-	$(CXX) $(CXXFLAGS) $(DFLAG) -fPIC -c -o $@ $<
+ffm/libffm.so: ffm-wrapper.cpp ffm-wrapper.h libffm/timer.cpp
+	$(CXX) -shared $(CXXFLAGS) $(DFLAG) -o $@ -fPIC libffm/timer.cpp $<
 
 clean:
-	rm -rf ffm-train ffm-predict *.o libffm.so build/ dist/ ffm.egg-info/
+	$(MAKE) -C libffm clean
+	rm -rf libffm.so build/ dist/ ffm.egg-info/

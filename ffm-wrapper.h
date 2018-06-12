@@ -3,7 +3,7 @@
 
 extern "C" {
 
-#include "ffm.h"
+#include "libffm/ffm.h"
 
 namespace ffm {
 
