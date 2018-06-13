@@ -85,8 +85,8 @@ _lib.ffm_load_model_c_string.argtypes = [ctypes.c_char_p]
 
 _lib.ffm_save_model_c_string.argtypes = [FFM_Model_ptr, ctypes.c_char_p]
 
-_lib.ffm_cleanup_data.argtypes = [FFM_Problem_ptr]
 _lib.ffm_cleanup_prediction.argtypes = [ctypes.POINTER(ctypes.c_float)]
+_lib.ffm_cleanup_problem.argtypes = [FFM_Problem_ptr]
 
 # some wrapping to make it easier to work with
 
@@ -132,7 +132,7 @@ class FFMData():
             self._data = None
 
     def __del__(self):
-        _lib.ffm_cleanup_data(self._data)
+        _lib.ffm_cleanup_problem(self._data)
 
     def num_rows(self):
         return self._data.size

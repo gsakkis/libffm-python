@@ -36,7 +36,7 @@ ffm_problem ffm_convert_data(ffm_line *data, ffm_int num_lines);
 
 void ffm_cleanup_prediction(ffm_float *f);
 
-void ffm_cleanup_data(ffm_problem *p);
+void ffm_cleanup_problem(ffm_problem &p);
 
 ffm_model ffm_init_model(ffm_problem &data, ffm_parameter params);
 

@@ -174,11 +174,11 @@ void ffm_cleanup_prediction(ffm_float* f) {
     delete[] f;
 }
 
-void ffm_cleanup_data(ffm_problem* p) {
-    delete[] p->data;
-    delete[] p->pos;
-    delete[] p->labels;
-    delete[] p->scales;
+void ffm_cleanup_problem(ffm_problem& prob) {
+    delete[] prob.data;
+    delete[] prob.pos;
+    delete[] prob.labels;
+    delete[] prob.scales;
 }
 
 } // namespace ffm
