@@ -2,7 +2,11 @@
 
 import os
 import ctypes
+
 import numpy as np
+
+
+Float_ptr = ctypes.POINTER(ctypes.c_float)
 
 
 class FFM_Parameter(ctypes.Structure):
@@ -10,56 +14,54 @@ class FFM_Parameter(ctypes.Structure):
         ('eta', ctypes.c_float),
         ('lam', ctypes.c_float),
         ('nr_iters', ctypes.c_int),
-        ("k", ctypes.c_int),
+        ('k', ctypes.c_int),
         ('normalization', ctypes.c_bool),
-        ('auto_stop', ctypes.c_bool)
+        ('auto_stop', ctypes.c_bool),
     ]
 
 
 class FFM_Model(ctypes.Structure):
     _fields_ = [
-        ("n", ctypes.c_int),
-        ("m", ctypes.c_int),
-        ("k", ctypes.c_int),
-        ("W", ctypes.POINTER(ctypes.c_float)),
+        ('n', ctypes.c_int),
+        ('m', ctypes.c_int),
+        ('k', ctypes.c_int),
+        ('W', Float_ptr),
         ('normalization', ctypes.c_bool)
     ]
+FFM_Model_ptr = ctypes.POINTER(FFM_Model)
 
 
 class FFM_Node(ctypes.Structure):
     _fields_ = [
-        ("f", ctypes.c_int),
-        ("j", ctypes.c_int),
-        ("v", ctypes.c_float),
+        ('f', ctypes.c_int),
+        ('j', ctypes.c_int),
+        ('v', ctypes.c_float),
     ]
+FFM_Node_ptr = ctypes.POINTER(FFM_Node)
 
 
 class FFM_Line(ctypes.Structure):
     _fields_ = [
-        ("data", ctypes.POINTER(FFM_Node)),
-        ("label", ctypes.c_float),
-        ("size", ctypes.c_int),
+        ('data', ctypes.POINTER(FFM_Node)),
+        ('label', ctypes.c_float),
+        ('size', ctypes.c_int),
     ]
+FFM_Line_ptr = ctypes.POINTER(FFM_Line)
 
 
 class FFM_Problem(ctypes.Structure):
     _fields_ = [
-        ("size", ctypes.c_int),
-        ("num_nodes", ctypes.c_long),
-
-        ("data", ctypes.POINTER(FFM_Node)),
-        ("pos", ctypes.POINTER(ctypes.c_long)),
-        ("labels", ctypes.POINTER(ctypes.c_float)),
-        ("scales", ctypes.POINTER(ctypes.c_float)),
-
-        ("n", ctypes.c_int),
-        ("m", ctypes.c_int),
+        ('size', ctypes.c_int),
+        ('num_nodes', ctypes.c_long),
+        ('data', ctypes.POINTER(FFM_Node)),
+        ('pos', ctypes.POINTER(ctypes.c_long)),
+        ('labels', Float_ptr),
+        ('scales', Float_ptr),
+        ('n', ctypes.c_int),
+        ('m', ctypes.c_int),
     ]
-
-FFM_Node_ptr = ctypes.POINTER(FFM_Node)
-FFM_Line_ptr = ctypes.POINTER(FFM_Line)
-FFM_Model_ptr = ctypes.POINTER(FFM_Model)
 FFM_Problem_ptr = ctypes.POINTER(FFM_Problem)
+
 
 path = os.path.dirname(os.path.abspath(__file__))
 lib_path = path + '/' + next(i for i in os.listdir(path) if i.endswith('.so'))
@@ -74,10 +76,10 @@ _lib.ffm_init_model.argtypes = [FFM_Problem_ptr, FFM_Parameter]
 _lib.ffm_train_iteration.restype = ctypes.c_float
 _lib.ffm_train_iteration.argtypes = [FFM_Problem_ptr, FFM_Model_ptr, FFM_Parameter]
 
-_lib.ffm_predict_array.argtypes = [FFM_Node_ptr, ctypes.c_int, FFM_Model_ptr]
 _lib.ffm_predict_array.restype = ctypes.c_float
+_lib.ffm_predict_array.argtypes = [FFM_Node_ptr, ctypes.c_int, FFM_Model_ptr]
 
-_lib.ffm_predict_batch.restype = ctypes.POINTER(ctypes.c_float)
+_lib.ffm_predict_batch.restype = Float_ptr
 _lib.ffm_predict_batch.argtypes = [FFM_Problem_ptr, FFM_Model_ptr]
 
 _lib.ffm_load_model_c_string.restype = FFM_Model
@@ -85,10 +87,9 @@ _lib.ffm_load_model_c_string.argtypes = [ctypes.c_char_p]
 
 _lib.ffm_save_model_c_string.argtypes = [FFM_Model_ptr, ctypes.c_char_p]
 
-_lib.ffm_cleanup_prediction.argtypes = [ctypes.POINTER(ctypes.c_float)]
 _lib.ffm_cleanup_problem.argtypes = [FFM_Problem_ptr]
 
-# some wrapping to make it easier to work with
+_lib.ffm_cleanup_prediction.argtypes = [Float_ptr]
 
 
 def wrap_tuples(row):
@@ -123,24 +124,17 @@ def wrap_dataset(X, y):
     return _lib.ffm_convert_data(line_array, line_array._length_)
 
 
-class FFMData():
+class FFMData:
 
-    def __init__(self, X=None, y=None):
-        if X is not None and y is not None:
-            self._data = wrap_dataset(X, y)
-        else:
-            self._data = None
+    def __init__(self, X, y):
+        self.labels = y
+        self._data = wrap_dataset(X, y)
 
     def __del__(self):
         _lib.ffm_cleanup_problem(self._data)
 
-    def num_rows(self):
-        return self._data.size
 
-# FFM model
-
-
-class FFM():
+class FFM:
 
     def __init__(self, eta=0.2, lam=0.00002, k=4):
         self._params = FFM_Parameter(eta=eta, lam=lam, k=k)
@@ -171,35 +165,26 @@ class FFM():
         return loss
 
     def predict(self, ffm_data):
+        return list(map(round, self.predict_proba(ffm_data)))
+
+    def predict_proba(self, ffm_data):
         data = ffm_data._data
         model = self._model
-
         pred_ptr = _lib.ffm_predict_batch(data, model)
-
         size = data.size
         pred_ptr_address = ctypes.addressof(pred_ptr.contents)
         array_cast = (ctypes.c_float * size).from_address(pred_ptr_address)
-
         pred = np.ctypeslib.as_array(array_cast)
         pred = np.copy(pred)
         _lib.ffm_cleanup_prediction(pred_ptr)
         return pred
 
-    def _predict_row(self, nodes):
-        n = nodes._length_
-        model = self._model
-        pred = _lib.ffm_predict_array(nodes, n, model)
-        return pred
-
     def fit(self, X, y, num_iter=10):
         ffm_data = FFMData(X, y)
         self.init_model(ffm_data)
-
         for i in range(num_iter):
-            self.model.iteration(ffm_data)
-
+            self.iteration(ffm_data)
+            print('iteration %d, ' % i, end='')
+            y_pred = self.predict_proba(ffm_data)
+            print('pred: ', y_pred)
         return self
-
-
-def read_model(path):
-    return FFM().read_model(path)
