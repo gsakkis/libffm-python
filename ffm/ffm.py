@@ -150,8 +150,18 @@ _scorers = {
 
 class FFM(BaseEstimator, ClassifierMixin):
 
-    def __init__(self, eta=0.2, lam=0.00002, k=4, normalization=True, num_iter=None, early_stopping=None, scorer='log_loss'):
-        self._params = FFM_Parameter(eta=eta, lam=lam, k=k, normalization=normalization)
+    def __init__(self, eta=0.2, lam=0.00002, k=4, normalization=True, num_iter=10, early_stopping=5,
+                 scorer='log_loss'):
+        """
+        :param eta: learning rate
+        :param lam: regularization parameter
+        :param k: number of latent factors
+        :param normalization: enable/disable instance-wise normalization
+        :param num_iter: number of iterations
+        :param early_stopping: early stopping rounds
+        :param scorer: either a `Scorer` instance or one of the predefined scorers:
+            'log_loss', 'roc_auc', 'f1', 'accuracy'
+        """
         self.set_params(eta=eta, lam=lam, k=k, normalization=normalization, num_iter=num_iter,
                         early_stopping=early_stopping, scorer=scorer)
         self._model = None
@@ -162,6 +172,8 @@ class FFM(BaseEstimator, ClassifierMixin):
         return self
 
     def save_model(self, path):
+        if self._model is None:
+            raise ValueError('Model has not been trained')
         path_char = ctypes.c_char_p(path.encode())
         _lib.ffm_save_model_c_string(self._model, path_char)
 
@@ -177,25 +189,23 @@ class FFM(BaseEstimator, ClassifierMixin):
         finally:
             _lib.ffm_cleanup_prediction(pred_ptr)
 
-    def fit(self, X, y=None, num_iter=10, val_data=None, early_stopping=5, scorer='log_loss'):
+    def fit(self, X, y=None, val_data=None):
         """
         :param X: feature data or FFMData format
         :param y: target
-        :param num_iter: number of iterations
         :param val_data: data for validation, list or FFMData format
-        :param early_stopping: early stopping rounds
-        :param scorer: Either a `Scorer` instance or one of the predefined scorers:
-            'log_loss', 'roc_auc', 'f1', 'accuracy'
         """
+        params = self.get_params()
+        ffm_params = FFM_Parameter(eta=params['eta'], lam=params['lam'], k=params['k'],
+                                   normalization=params['normalization'])
         train_data = X if isinstance(X, FFMData) else FFMData(X, y)
-        self._model = _lib.ffm_init_model(train_data._data, self._params)
+        self._model = _lib.ffm_init_model(train_data._data, ffm_params)
+        scorer = params['scorer']
         if isinstance(scorer, str):
             try:
                 scorer = _scorers[scorer]
             except KeyError:
                 raise ValueError('Unknown scorer: {}'.format(scorer))
-
-        self.set_params(num_iter=num_iter, early_stopping=early_stopping, scorer=scorer)
 
         # Translate Validation Data
         if val_data:
@@ -217,8 +227,9 @@ class FFM(BaseEstimator, ClassifierMixin):
 
         # Training Process
         log_loss = _scorers['log_loss']
-        for i in range(num_iter):
-            _lib.ffm_train_iteration(train_data._data, self._model, self._params)
+        early_stopping = params['early_stopping']
+        for i in range(params['num_iter']):
+            _lib.ffm_train_iteration(train_data._data, self._model, ffm_params)
             train_loss = self._score(train_data, log_loss)
             train_score = self._score(train_data, scorer)
             if val_data:
