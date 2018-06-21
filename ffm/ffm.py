@@ -229,17 +229,18 @@ class FFM(BaseEstimator, ClassifierMixin):
 
             if val:
                 val_score = self.score(val_data, val_data.labels, scoring=metric)
-                if cmp(val_score, score):
-                    score = val_score
-                    score_index = i
-                    best_model = self._model
-                print_line(data=[i, train_loss, train_score, val_score, score_index], val=val)
             else:
-                if cmp(val_score, score):
-                    score = val_score
-                    score_index = i
-                    best_model = self._model
-                print_line(data=[i, train_loss, train_score, score_index], val=val)
+                val_score = train_score
+
+            if cmp(val_score, score):
+                score = val_score
+                score_index = i
+                best_model = self._model
+
+            if val:
+                print_line([i, train_loss, train_score, val_score, score_index], val_data)
+            else:
+                print_line([i, train_loss, train_score, score_index], val_data)
 
             if (i - score_index) >= early_stopping:
                 print("Early Stoping At %d Rounds" % score_index)
@@ -280,6 +281,6 @@ def print_line(data=None, val=True):
             print('%-8d%-16.4f%-16.4f%-16.4f%-8d' %(data[0], data[1], data[2], data[3], data[4]))
     else:
         if data is None:
-            print('%-8s%-16s%-16s%-16s%-8s' %("Iter", "Train_Loss", "Train_Score", "Best_Iter"))
+            print('%-8s%-16s%-16s%-8s' % ("Iter", "Train_Loss", "Train_Score", "Best_Iter"))
         else:
             print('%-8d%-16.4f%-16.4f%-8d' %(data[0], data[1], data[2], data[3]))
