@@ -4,7 +4,7 @@ import os
 import ctypes
 
 import numpy as np
-from sklearn.metrics import log_loss, roc_auc_score, accuracy_score, f1_score
+from sklearn import metrics
 from sklearn.base import BaseEstimator, ClassifierMixin
 
 
@@ -145,71 +145,48 @@ class FFM(BaseEstimator, ClassifierMixin):
 
     def read_model(self, path):
         path_char = ctypes.c_char_p(path.encode())
-        model = _lib.ffm_load_model_c_string(path_char)
-        self._model = model
+        self._model = _lib.ffm_load_model_c_string(path_char)
         return self
 
     def save_model(self, path):
-        model = self._model
         path_char = ctypes.c_char_p(path.encode())
-        _lib.ffm_save_model_c_string(model, path_char)
-
-    def init_model(self, ffm_data):
-        params = self._params
-        model = _lib.ffm_init_model(ffm_data._data, params)
-        self._model = model
-        return self
-
-    def iteration(self, ffm_data):
-        data = ffm_data._data
-        model = self._model
-        params = self._params
-        loss = _lib.ffm_train_iteration(data, model, params)
-        return loss
+        _lib.ffm_save_model_c_string(self._model, path_char)
 
     def predict(self, ffm_data):
-        return list(map(round, self.predict_proba(ffm_data)))
+        return (self.predict_proba(ffm_data) > 0.5).astype(np.uint8)
 
     def predict_proba(self, ffm_data):
-        data = ffm_data._data
-        model = self._model
-        pred_ptr = _lib.ffm_predict_batch(data, model)
-        size = data.size
-        pred_ptr_address = ctypes.addressof(pred_ptr.contents)
-        array_cast = (ctypes.c_float * size).from_address(pred_ptr_address)
-        pred = np.ctypeslib.as_array(array_cast)
-        pred = np.copy(pred)
-        _lib.ffm_cleanup_prediction(pred_ptr)
-        return pred
+        pred_ptr = _lib.ffm_predict_batch(ffm_data._data, self._model)
+        try:
+            pred_ptr_address = ctypes.addressof(pred_ptr.contents)
+            array_cast = (ctypes.c_float * ffm_data._data.size).from_address(pred_ptr_address)
+            return np.ctypeslib.as_array(array_cast).copy()
+        finally:
+            _lib.ffm_cleanup_prediction(pred_ptr)
 
-    def fit(self, X, y=None, num_iter=10, val_data=None, metric='logloss', early_stopping=5, maximum=False):
-        '''
-        X: feature data or FFMData format
-        y: target
-        num_iter: number of iterations
-        val_data: data for validation, list or FFMData format
-        metric: str or self defined function, build_in metrics are 'auc', 'logloss', 'f1', 'accuracy'
-        early_stopping: early stopping rounds
-        maximum: whether the biger the score, the better the metric
-        '''
-        # Translate Traing Data
-        if isinstance(X, FFMData):
-            train_data = X
-        else:
-            train_data = FFMData(X, y)
-
-        # Init Model
-        self.init_model(train_data)
+    def fit(self, X, y=None, num_iter=10, val_data=None, early_stopping=5, metric='log_loss',
+            maximum=False):
+        """
+        :param X: feature data or FFMData format
+        :param y: target
+        :param num_iter: number of iterations
+        :param val_data: data for validation, list or FFMData format
+        :param early_stopping: early stopping rounds
+        :param metric: a f(true_labels, predicted_labels) function, or a string of one of the
+            predefined metrics: 'log_loss', 'roc_auc', 'f1', 'accuracy'
+        :param maximum: whether the bigger the score, the better the metric
+        """
+        train_data = X if isinstance(X, FFMData) else FFMData(X, y)
+        self._model = _lib.ffm_init_model(train_data._data, self._params)
         self.set_params(num_iter=num_iter, early_stopping=early_stopping, metric=metric)
 
         # Translate Validation Data
-        val = True if val_data is not None else False
-        if val:
+        if val_data:
             if not isinstance(val_data, FFMData):
                 val_data = FFMData(val_data[0], val_data[1])
-
-        # Print Header
-        print_line(data=None, val=val)
+            print('%-8s%-16s%-16s%-16s%-8s' % ('Iter', 'Train_Loss', 'Train_Score', 'Val_Score', 'Best_Iter'))
+        else:
+            print('%-8s%-16s%-16s%-8s' % ('Iter', 'Train_Loss', 'Train_Score', 'Best_Iter'))
 
         # Score Recorder: > or <
         best_model = None
@@ -221,14 +198,14 @@ class FFM(BaseEstimator, ClassifierMixin):
             cmp = lambda x, y: x < y
             score = np.inf
 
-        # Trainning Process
+        # Training Process
         for i in range(num_iter):
-            self.iteration(train_data)
-            train_loss = self.score(train_data, train_data.labels, scoring='logloss')
-            train_score = self.score(train_data, train_data.labels, scoring=metric)
+            _lib.ffm_train_iteration(train_data._data, self._model, self._params)
+            train_loss = self._score(train_data, train_data.labels, scoring='log_loss')
+            train_score = self._score(train_data, train_data.labels, scoring=metric)
 
-            if val:
-                val_score = self.score(val_data, val_data.labels, scoring=metric)
+            if val_data:
+                val_score = self._score(val_data, val_data.labels, scoring=metric)
             else:
                 val_score = train_score
 
@@ -237,50 +214,33 @@ class FFM(BaseEstimator, ClassifierMixin):
                 score_index = i
                 best_model = self._model
 
-            if val:
-                print_line([i, train_loss, train_score, val_score, score_index], val_data)
+            if val_data:
+                print('%-8d%-16.4f%-16.4f%-16.4f%-8d' % (i, train_loss, train_score, val_score, score_index))
             else:
-                print_line([i, train_loss, train_score, score_index], val_data)
+                print('%-8d%-16.4f%-16.4f%-8d' % (i, train_loss, train_score, score_index))
 
             if (i - score_index) >= early_stopping:
-                print("Early Stoping At %d Rounds" % score_index)
+                print('Early stopping at %d rounds' % i)
                 break
 
             self._model = best_model
         return self
 
-    def score(self, X, y=None, scoring='logloss'):
-        if self._model is None:
-            raise ValueError("``score`` must be call after fit" )
-        if isinstance(X, FFMData):
-            val_data = X
-        else:
-            val_data = FFMData(X, y)
+    def _score(self, X, y=None, scoring='log_loss'):
+        val_data = X if isinstance(X, FFMData) else FFMData(X, y)
         y_pred = self.predict_proba(val_data)
         y_true = val_data.labels
-        if isinstance(scoring, str):
-            if scoring == 'logloss':
-                return log_loss(y_true, y_pred)
-            elif scoring == 'auc':
-                return roc_auc_score(y_true, y_pred)
-            elif scoring == 'f1':
-                y_pred = [round(i) for i in y_pred]
-                return f1_score(y_true, y_pred)
-            else:
-                y_pred = [round(i) for i in y_pred]
-                return accuracy_score(y_true, y_pred)
-        else :
+        if callable(scoring):
             return scoring(y_true, y_pred)
-
-
-def print_line(data=None, val=True):
-    if val:
-        if data is None:
-            print('%-8s%-16s%-16s%-16s%-8s' %("Iter", "Train_Loss", "Train_Score", "Val_Score", "Best_Iter"))
+        elif scoring == 'log_loss':
+            return metrics.log_loss(y_true, y_pred)
+        elif scoring == 'roc_auc':
+            return metrics.roc_auc_score(y_true, y_pred)
+        elif scoring == 'f1':
+            y_pred = [round(i) for i in y_pred]
+            return metrics.f1_score(y_true, y_pred)
+        elif scoring == 'accuracy':
+            y_pred = [round(i) for i in y_pred]
+            return metrics.accuracy_score(y_true, y_pred)
         else:
-            print('%-8d%-16.4f%-16.4f%-16.4f%-8d' %(data[0], data[1], data[2], data[3], data[4]))
-    else:
-        if data is None:
-            print('%-8s%-16s%-16s%-8s' % ("Iter", "Train_Loss", "Train_Score", "Best_Iter"))
-        else:
-            print('%-8d%-16.4f%-16.4f%-8d' %(data[0], data[1], data[2], data[3]))
+            raise ValueError('Unknown scoring function: %s' % scoring)
