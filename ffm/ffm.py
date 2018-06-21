@@ -2,6 +2,8 @@
 
 import os
 import ctypes
+import operator as op
+from collections import namedtuple
 
 import numpy as np
 from sklearn import metrics
@@ -136,11 +138,22 @@ class FFMData:
         _lib.ffm_cleanup_problem(self._data)
 
 
+Scorer = namedtuple('Scorer', ['metric', 'maximum', 'probabilities'])
+
+_scorers = {
+    'log_loss': Scorer(metrics.log_loss, maximum=False, probabilities=True),
+    'roc_auc': Scorer(metrics.roc_auc_score, maximum=True, probabilities=True),
+    'f1': Scorer(metrics.f1_score, maximum=True, probabilities=False),
+    'accuracy': Scorer(metrics.accuracy_score, maximum=True, probabilities=False),
+}
+
+
 class FFM(BaseEstimator, ClassifierMixin):
 
-    def __init__(self, eta=0.2, lam=0.00002, k=4, normalization=True, num_iter=None, early_stopping=None, metric=None):
+    def __init__(self, eta=0.2, lam=0.00002, k=4, normalization=True, num_iter=None, early_stopping=None, scorer='log_loss'):
         self._params = FFM_Parameter(eta=eta, lam=lam, k=k, normalization=normalization)
-        self.set_params(eta=eta, lam=lam, k=k, normalization=normalization, num_iter=num_iter, early_stopping=early_stopping, metric=metric)
+        self.set_params(eta=eta, lam=lam, k=k, normalization=normalization, num_iter=num_iter,
+                        early_stopping=early_stopping, scorer=scorer)
         self._model = None
 
     def read_model(self, path):
@@ -164,21 +177,25 @@ class FFM(BaseEstimator, ClassifierMixin):
         finally:
             _lib.ffm_cleanup_prediction(pred_ptr)
 
-    def fit(self, X, y=None, num_iter=10, val_data=None, early_stopping=5, metric='log_loss',
-            maximum=False):
+    def fit(self, X, y=None, num_iter=10, val_data=None, early_stopping=5, scorer='log_loss'):
         """
         :param X: feature data or FFMData format
         :param y: target
         :param num_iter: number of iterations
         :param val_data: data for validation, list or FFMData format
         :param early_stopping: early stopping rounds
-        :param metric: a f(true_labels, predicted_labels) function, or a string of one of the
-            predefined metrics: 'log_loss', 'roc_auc', 'f1', 'accuracy'
-        :param maximum: whether the bigger the score, the better the metric
+        :param scorer: Either a `Scorer` instance or one of the predefined scorers:
+            'log_loss', 'roc_auc', 'f1', 'accuracy'
         """
         train_data = X if isinstance(X, FFMData) else FFMData(X, y)
         self._model = _lib.ffm_init_model(train_data._data, self._params)
-        self.set_params(num_iter=num_iter, early_stopping=early_stopping, metric=metric)
+        if isinstance(scorer, str):
+            try:
+                scorer = _scorers[scorer]
+            except KeyError:
+                raise ValueError('Unknown scorer: {}'.format(scorer))
+
+        self.set_params(num_iter=num_iter, early_stopping=early_stopping, scorer=scorer)
 
         # Translate Validation Data
         if val_data:
@@ -191,21 +208,21 @@ class FFM(BaseEstimator, ClassifierMixin):
         # Score Recorder: > or <
         best_model = None
         score_index = -1
-        if maximum:
-            cmp = lambda x, y: x > y
+        if scorer.maximum:
+            cmp = op.gt
             score = -np.inf
         else:
-            cmp = lambda x, y: x < y
+            cmp = op.lt
             score = np.inf
 
         # Training Process
+        log_loss = _scorers['log_loss']
         for i in range(num_iter):
             _lib.ffm_train_iteration(train_data._data, self._model, self._params)
-            train_loss = self._score(train_data, train_data.labels, scoring='log_loss')
-            train_score = self._score(train_data, train_data.labels, scoring=metric)
-
+            train_loss = self._score(train_data, log_loss)
+            train_score = self._score(train_data, scorer)
             if val_data:
-                val_score = self._score(val_data, val_data.labels, scoring=metric)
+                val_score = self._score(val_data, scorer)
             else:
                 val_score = train_score
 
@@ -226,21 +243,6 @@ class FFM(BaseEstimator, ClassifierMixin):
             self._model = best_model
         return self
 
-    def _score(self, X, y=None, scoring='log_loss'):
-        val_data = X if isinstance(X, FFMData) else FFMData(X, y)
-        y_pred = self.predict_proba(val_data)
-        y_true = val_data.labels
-        if callable(scoring):
-            return scoring(y_true, y_pred)
-        elif scoring == 'log_loss':
-            return metrics.log_loss(y_true, y_pred)
-        elif scoring == 'roc_auc':
-            return metrics.roc_auc_score(y_true, y_pred)
-        elif scoring == 'f1':
-            y_pred = [round(i) for i in y_pred]
-            return metrics.f1_score(y_true, y_pred)
-        elif scoring == 'accuracy':
-            y_pred = [round(i) for i in y_pred]
-            return metrics.accuracy_score(y_true, y_pred)
-        else:
-            raise ValueError('Unknown scoring function: %s' % scoring)
+    def _score(self, ffm_data, scorer):
+        predict = self.predict_proba if scorer.probabilities else self.predict
+        return scorer.metric(ffm_data.labels, predict(ffm_data))
