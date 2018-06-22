@@ -1,1 +1,1 @@
-from .ffm import FFMData, FFM
+from .ffm import FFM

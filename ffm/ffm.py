@@ -2,6 +2,7 @@
 
 import os
 import ctypes
+import itertools as it
 import operator as op
 from collections import namedtuple
 
@@ -96,46 +97,17 @@ _lib.ffm_cleanup_problem.argtypes = [FFM_Problem_ptr]
 _lib.ffm_cleanup_prediction.argtypes = [Float_ptr]
 
 
-def wrap_tuples(row):
-    size = len(row)
-    nodes_array = (FFM_Node * size)()
-
-    for i, (f, j, v) in enumerate(row):
-        node = nodes_array[i]
-        node.f = f
-        node.j = j
-        node.v = v
-
-    return nodes_array
-
-
-def wrap_dataset_init(X, target):
-    l = len(target)
-    data = (FFM_Line * l)()
-
-    for i, (x, y) in enumerate(zip(X, target)):
-        d = data[i]
-        nodes = wrap_tuples(x)
-        d.data = nodes
-        d.label = y
-        d.size = nodes._length_
-
-    return data
-
-
-def wrap_dataset(X, y):
-    line_array = wrap_dataset_init(X, y)
-    return _lib.ffm_convert_data(line_array, line_array._length_)
-
-
-class FFMData:
-
-    def __init__(self, X, y):
-        self.labels = y
-        self._data = wrap_dataset(X, y)
-
-    def __del__(self):
-        _lib.ffm_cleanup_problem(self._data)
+def to_ffm_problem(X, y=it.repeat(0)):
+    lines = (FFM_Line * len(X))()
+    for line, row, label in zip(lines, X, y):
+        line.label = label
+        line.size = len(row)
+        line.data = (FFM_Node * line.size)()
+        for node, (f, j, v) in zip(line.data, row):
+            node.f = f
+            node.j = j
+            node.v = v
+    return _lib.ffm_convert_data(lines, len(lines))
 
 
 Scorer = namedtuple('Scorer', ['metric', 'maximum', 'probabilities'])
@@ -181,46 +153,49 @@ class FFM(BaseEstimator, ClassifierMixin):
         return (self.predict_proba(X) > 0.5).astype(np.uint8)
 
     def predict_proba(self, X):
-        if not isinstance(X, FFMData):
-            ffm_data = FFMData(X, np.zeros(len(X)))
-        else:
-            ffm_data = X
-        pred_ptr = _lib.ffm_predict_batch(ffm_data._data, self._model)
+        problem = to_ffm_problem(X) if not isinstance(X, FFM_Problem) else X
+        pred_ptr = _lib.ffm_predict_batch(problem, self._model)
         try:
             pred_ptr_address = ctypes.addressof(pred_ptr.contents)
-            array_cast = (ctypes.c_float * ffm_data._data.size).from_address(pred_ptr_address)
+            array_cast = (ctypes.c_float * problem.size).from_address(pred_ptr_address)
             return np.ctypeslib.as_array(array_cast).copy()
         finally:
             _lib.ffm_cleanup_prediction(pred_ptr)
+            if problem is not X:
+                _lib.ffm_cleanup_problem(problem)
 
     def fit(self, X, y, val_X_y=None):
         """
-        :param X: feature data or FFMData format
+        :param X: feature data
         :param y: target
         :param val_X_y: (X, y) data for validation
         """
-        params = self.get_params()
-        ffm_params = FFM_Parameter(eta=params['eta'], lam=params['lam'], k=params['k'],
-                                   normalization=params['normalization'])
-
-        train_data = FFMData(X, y)
-        self._model = _lib.ffm_init_model(train_data._data, ffm_params)
-        scorer = params['scorer']
+        scorer = self.scorer
         if isinstance(scorer, str):
             try:
                 scorer = _scorers[scorer]
             except KeyError:
                 raise ValueError('Unknown scorer: {}'.format(scorer))
 
-        # Translate Validation Data
-        if val_X_y:
-            val_data = FFMData(*val_X_y)
-            print('%-8s%-16s%-16s%-16s%-8s' % ('Iter', 'Train_Loss', 'Train_Score', 'Val_Score', 'Best_Iter'))
-        else:
-            val_data = None
-            print('%-8s%-16s%-16s%-8s' % ('Iter', 'Train_Loss', 'Train_Score', 'Best_Iter'))
+        val_problem = None
+        problem = to_ffm_problem(X, y)
+        try:
+            if val_X_y:
+                val_problem = to_ffm_problem(val_X_y[0])
+                val_X_y = (val_problem, val_X_y[1])
+            self._fit(problem, y, val_X_y, scorer)
+        finally:
+            _lib.ffm_cleanup_problem(problem)
+            if val_problem is not None:
+                _lib.ffm_cleanup_problem(val_problem)
 
-        # Score Recorder: > or <
+        return self
+
+    def _fit(self, problem, y, val_X_y, scorer):
+        ffm_params = FFM_Parameter(eta=self.eta, lam=self.lam, k=self.k,
+                                   normalization=self.normalization)
+        self._model = _lib.ffm_init_model(problem, ffm_params)
+
         best_model = None
         score_index = -1
         if scorer.maximum:
@@ -231,14 +206,19 @@ class FFM(BaseEstimator, ClassifierMixin):
             score = np.inf
 
         # Training Process
+        if val_X_y:
+            print('%-8s%-16s%-16s%-16s%-8s' % ('Iter', 'Train_Loss', 'Train_Score', 'Val_Score', 'Best_Iter'))
+        else:
+            print('%-8s%-16s%-16s%-8s' % ('Iter', 'Train_Loss', 'Train_Score', 'Best_Iter'))
+
         log_loss = _scorers['log_loss']
-        early_stopping = params['early_stopping']
-        for i in range(params['num_iter']):
-            _lib.ffm_train_iteration(train_data._data, self._model, ffm_params)
-            train_loss = self._score(train_data, log_loss)
-            train_score = self._score(train_data, scorer)
-            if val_data:
-                val_score = self._score(val_data, scorer)
+        early_stopping = self.early_stopping
+        for i in range(self.num_iter):
+            _lib.ffm_train_iteration(problem, self._model, ffm_params)
+            train_loss = self._score(problem, y, log_loss)
+            train_score = self._score(problem, y, scorer)
+            if val_X_y:
+                val_score = self._score(*val_X_y, scorer)
             else:
                 val_score = train_score
 
@@ -247,7 +227,7 @@ class FFM(BaseEstimator, ClassifierMixin):
                 score_index = i
                 best_model = self._model
 
-            if val_data:
+            if val_X_y:
                 print('%-8d%-16.4f%-16.4f%-16.4f%-8d' % (i, train_loss, train_score, val_score, score_index))
             else:
                 print('%-8d%-16.4f%-16.4f%-8d' % (i, train_loss, train_score, score_index))
@@ -257,8 +237,7 @@ class FFM(BaseEstimator, ClassifierMixin):
                 break
 
             self._model = best_model
-        return self
 
-    def _score(self, ffm_data, scorer):
+    def _score(self, X, y, scorer):
         predict = self.predict_proba if scorer.probabilities else self.predict
-        return scorer.metric(ffm_data.labels, predict(ffm_data))
+        return scorer.metric(y, predict(X))
