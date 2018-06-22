@@ -14,7 +14,14 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 Float_ptr = ctypes.POINTER(ctypes.c_float)
 
 
-class FFM_Parameter(ctypes.Structure):
+class Structure(ctypes.Structure):
+
+    @classmethod
+    def pointer(cls):
+        return ctypes.POINTER(cls)
+
+
+class FFM_Parameter(Structure):
     _fields_ = [
         ('eta', ctypes.c_float),
         ('lam', ctypes.c_float),
@@ -25,7 +32,7 @@ class FFM_Parameter(ctypes.Structure):
     ]
 
 
-class FFM_Model(ctypes.Structure):
+class FFM_Model(Structure):
     _fields_ = [
         ('n', ctypes.c_int),
         ('m', ctypes.c_int),
@@ -33,32 +40,29 @@ class FFM_Model(ctypes.Structure):
         ('W', Float_ptr),
         ('normalization', ctypes.c_bool)
     ]
-FFM_Model_ptr = ctypes.POINTER(FFM_Model)
 
 
-class FFM_Node(ctypes.Structure):
+class FFM_Node(Structure):
     _fields_ = [
         ('f', ctypes.c_int),
         ('j', ctypes.c_int),
         ('v', ctypes.c_float),
     ]
-FFM_Node_ptr = ctypes.POINTER(FFM_Node)
 
 
-class FFM_Line(ctypes.Structure):
+class FFM_Line(Structure):
     _fields_ = [
-        ('data', ctypes.POINTER(FFM_Node)),
+        ('data', FFM_Node.pointer()),
         ('label', ctypes.c_float),
         ('size', ctypes.c_int),
     ]
-FFM_Line_ptr = ctypes.POINTER(FFM_Line)
 
 
-class FFM_Problem(ctypes.Structure):
+class FFM_Problem(Structure):
     _fields_ = [
         ('size', ctypes.c_int),
         ('num_nodes', ctypes.c_long),
-        ('data', ctypes.POINTER(FFM_Node)),
+        ('data', FFM_Node.pointer()),
         ('pos', ctypes.POINTER(ctypes.c_long)),
         ('labels', Float_ptr),
         ('scales', Float_ptr),
@@ -82,33 +86,30 @@ class FFM_Problem(ctypes.Structure):
         _lib.ffm_cleanup_problem(self)
 
 
-FFM_Problem_ptr = ctypes.POINTER(FFM_Problem)
-
-
 path = os.path.dirname(os.path.abspath(__file__))
 lib_path = path + '/' + next(i for i in os.listdir(path) if i.endswith('.so'))
 _lib = ctypes.cdll.LoadLibrary(lib_path)
 
-_lib.ffm_init_problem.argtypes = [FFM_Problem_ptr, FFM_Line_ptr, ctypes.c_int]
+_lib.ffm_init_problem.argtypes = [FFM_Problem.pointer(), FFM_Line.pointer(), ctypes.c_int]
 
 _lib.ffm_init_model.restype = FFM_Model
-_lib.ffm_init_model.argtypes = [FFM_Problem_ptr, FFM_Parameter]
+_lib.ffm_init_model.argtypes = [FFM_Problem.pointer(), FFM_Parameter]
 
 _lib.ffm_train_iteration.restype = ctypes.c_float
-_lib.ffm_train_iteration.argtypes = [FFM_Problem_ptr, FFM_Model_ptr, FFM_Parameter]
+_lib.ffm_train_iteration.argtypes = [FFM_Problem.pointer(), FFM_Model.pointer(), FFM_Parameter]
 
 _lib.ffm_predict_array.restype = ctypes.c_float
-_lib.ffm_predict_array.argtypes = [FFM_Node_ptr, ctypes.c_int, FFM_Model_ptr]
+_lib.ffm_predict_array.argtypes = [FFM_Node.pointer(), ctypes.c_int, FFM_Model.pointer()]
 
 _lib.ffm_predict_batch.restype = Float_ptr
-_lib.ffm_predict_batch.argtypes = [FFM_Problem_ptr, FFM_Model_ptr]
+_lib.ffm_predict_batch.argtypes = [FFM_Problem.pointer(), FFM_Model.pointer()]
 
 _lib.ffm_load_model_c_string.restype = FFM_Model
 _lib.ffm_load_model_c_string.argtypes = [ctypes.c_char_p]
 
-_lib.ffm_save_model_c_string.argtypes = [FFM_Model_ptr, ctypes.c_char_p]
+_lib.ffm_save_model_c_string.argtypes = [FFM_Model.pointer(), ctypes.c_char_p]
 
-_lib.ffm_cleanup_problem.argtypes = [FFM_Problem_ptr]
+_lib.ffm_cleanup_problem.argtypes = [FFM_Problem.pointer()]
 
 _lib.ffm_cleanup_prediction.argtypes = [Float_ptr]
 
