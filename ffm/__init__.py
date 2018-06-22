@@ -71,18 +71,16 @@ class FFM(BaseEstimator, ClassifierMixin):
                 raise ValueError('Unknown scorer: {}'.format(scorer))
 
         problem = FFM_Problem(X, y)
-        if val_X_y:
-            val_X_y = (FFM_Problem(val_X_y[0]), val_X_y[1])
-
         ffm_params = FFM_Parameter(eta=self.eta, lam=self.lam, k=self.k,
                                    normalization=self.normalization)
         self._model = lib.ffm_init_model(problem, ffm_params)
-
-        # Training Process
         if val_X_y:
+            val_X_y = (FFM_Problem(val_X_y[0]), val_X_y[1])
+            log_format = '%(i)-8d%(train_score)-16.4f%(score)-16.4f%(best_score_index)-8d'
             logger.info('%-8s%-16s%-16s%-16s%-8s',
                         'Iter', 'Train_Loss', 'Train_Score', 'Val_Score', 'Best_Iter')
         else:
+            log_format = '%(i)-8d%(train_score)-16.4f%(best_score_index)-8d'
             logger.info('%-8s%-16s%-16s%-8s', 'Iter', 'Train_Loss', 'Train_Score', 'Best_Iter')
 
         best_score = -np.inf
@@ -95,16 +93,9 @@ class FFM(BaseEstimator, ClassifierMixin):
                 best_score = score
                 best_score_index = i
 
-            train_loss = - neg_log_loss(self, problem, y)
             train_score *= scorer._sign
             score *= scorer._sign
-            if val_X_y:
-                logger.info('%-8d%-16.4f%-16.4f%-16.4f%-8d',
-                            i, train_loss, train_score, score, best_score_index)
-            else:
-                logger.info('%-8d%-16.4f%-16.4f%-8d',
-                            i, train_loss, train_score, best_score_index)
-
+            logger.info(log_format, locals())
             if (i - best_score_index) >= early_stopping:
                 logger.info('Early stopping at %d rounds', i)
                 break
