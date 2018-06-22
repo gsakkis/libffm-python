@@ -111,10 +111,10 @@ ffm_float ffm_train_iteration(ffm_problem& prob, ffm_model& model, ffm_parameter
         ffm_node *end = &X[P[i + 1]];
 
         ffm_float r = params.normalization ? R[i] : 1;
-        ffm_float t = wTx(begin, end, r, model);
+        ffm_double t = wTx(begin, end, r, model);
 
-        ffm_float expnyt = exp(-y * t);
-        loss = loss + log(1 + expnyt);
+        ffm_double expnyt = exp(-y * t);
+        loss += log1p(expnyt);
 
         ffm_float kappa = -y * expnyt / (1 + expnyt);
         wTx(begin, end, r, model, kappa, params.eta, params.lambda, true);
