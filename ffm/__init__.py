@@ -1,3 +1,5 @@
+__all__ = ['FFM', 'read_libffm']
+
 import ctypes
 import logging
 import operator as op
@@ -131,3 +133,17 @@ class FFM(BaseEstimator, ClassifierMixin):
     def _score(self, X, y, scorer):
         predict = self.predict_proba if scorer.probabilities else self.predict
         return scorer.metric(y, predict(X))
+
+
+def read_libffm(path):
+    X, y = [], []
+    with open(path, 'rt') as f:
+        for line in f:
+            items = line.strip().split(' ')
+            y.append(int(items.pop(0)))
+            row = []
+            for item in items:
+                field, feature, value = item.split(':')
+                row.append((int(field), int(feature), float(value)))
+            X.append(row)
+    return X, y
