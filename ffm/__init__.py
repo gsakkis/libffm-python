@@ -1,4 +1,5 @@
 import ctypes
+import logging
 import operator as op
 from collections import namedtuple
 
@@ -9,8 +10,8 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from ._wrapper import lib, FFM_Problem, FFM_Parameter
 
 
+logger = logging.getLogger('ffm')
 Scorer = namedtuple('Scorer', ['metric', 'maximum', 'probabilities'])
-
 _scorers = {
     'log_loss': Scorer(metrics.log_loss, maximum=False, probabilities=True),
     'roc_auc': Scorer(metrics.roc_auc_score, maximum=True, probabilities=True),
@@ -93,9 +94,10 @@ class FFM(BaseEstimator, ClassifierMixin):
 
         # Training Process
         if val_X_y:
-            print('%-8s%-16s%-16s%-16s%-8s' % ('Iter', 'Train_Loss', 'Train_Score', 'Val_Score', 'Best_Iter'))
+            logger.info('%-8s%-16s%-16s%-16s%-8s',
+                        'Iter', 'Train_Loss', 'Train_Score', 'Val_Score', 'Best_Iter')
         else:
-            print('%-8s%-16s%-16s%-8s' % ('Iter', 'Train_Loss', 'Train_Score', 'Best_Iter'))
+            logger.info('%-8s%-16s%-16s%-8s', 'Iter', 'Train_Loss', 'Train_Score', 'Best_Iter')
 
         log_loss = _scorers['log_loss']
         early_stopping = self.early_stopping
@@ -114,12 +116,12 @@ class FFM(BaseEstimator, ClassifierMixin):
                 best_model = self._model
 
             if val_X_y:
-                print('%-8d%-16.4f%-16.4f%-16.4f%-8d' % (i, train_loss, train_score, val_score, score_index))
+                logger.info('%-8d%-16.4f%-16.4f%-16.4f%-8d', i, train_loss, train_score, val_score, score_index)
             else:
-                print('%-8d%-16.4f%-16.4f%-8d' % (i, train_loss, train_score, score_index))
+                logger.info('%-8d%-16.4f%-16.4f%-8d', i, train_loss, train_score, score_index)
 
             if (i - score_index) >= early_stopping:
-                print('Early stopping at %d rounds' % i)
+                logger.info('Early stopping at %d rounds', i)
                 break
 
             self._model = best_model
