@@ -32,7 +32,7 @@ ffm_model ffm_load_model_c_string(char *path);
 
 void ffm_save_model_c_string(ffm_model &model, char *path);
 
-ffm_problem ffm_convert_data(ffm_line *data, ffm_int num_lines);
+void ffm_init_problem(ffm_problem &p, ffm_line *data, ffm_int num_lines);
 
 void ffm_cleanup_prediction(ffm_float *f);
 
