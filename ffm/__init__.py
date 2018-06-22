@@ -2,8 +2,6 @@ __all__ = ['FFM', 'read_libffm']
 
 import ctypes
 import logging
-import operator as op
-from collections import namedtuple
 
 import numpy as np
 from sklearn import metrics
@@ -13,19 +11,13 @@ from ._wrapper import lib, FFM_Problem, FFM_Parameter
 
 
 logger = logging.getLogger('ffm')
-Scorer = namedtuple('Scorer', ['metric', 'maximum', 'probabilities'])
-_scorers = {
-    'log_loss': Scorer(metrics.log_loss, maximum=False, probabilities=True),
-    'roc_auc': Scorer(metrics.roc_auc_score, maximum=True, probabilities=True),
-    'f1': Scorer(metrics.f1_score, maximum=True, probabilities=False),
-    'accuracy': Scorer(metrics.accuracy_score, maximum=True, probabilities=False),
-}
+neg_log_loss = metrics.SCORERS['neg_log_loss']
 
 
 class FFM(BaseEstimator, ClassifierMixin):
 
     def __init__(self, eta=0.2, lam=0.00002, k=4, normalization=True, num_iter=10, early_stopping=5,
-                 scorer='log_loss'):
+                 scorer=neg_log_loss):
         """
         :param eta: learning rate
         :param lam: regularization parameter
@@ -33,8 +25,7 @@ class FFM(BaseEstimator, ClassifierMixin):
         :param normalization: enable/disable instance-wise normalization
         :param num_iter: number of iterations
         :param early_stopping: early stopping rounds
-        :param scorer: either a `Scorer` instance or one of the predefined scorers:
-            'log_loss', 'roc_auc', 'f1', 'accuracy'
+        :param scorer: an sklearn.metrics Scorer, or one of string keys in sklearn.metrics.SCORERS
         """
         self.set_params(eta=eta, lam=lam, k=k, normalization=normalization, num_iter=num_iter,
                         early_stopping=early_stopping, scorer=scorer)
@@ -64,6 +55,8 @@ class FFM(BaseEstimator, ClassifierMixin):
         finally:
             lib.ffm_cleanup_prediction(pred_ptr)
 
+    decision_function = predict_proba
+
     def fit(self, X, y, val_X_y=None):
         """
         :param X: training data as a sequence of (field, feature, value) triples
@@ -73,7 +66,7 @@ class FFM(BaseEstimator, ClassifierMixin):
         scorer = self.scorer
         if isinstance(scorer, str):
             try:
-                scorer = _scorers[scorer]
+                scorer = metrics.SCORERS[scorer]
             except KeyError:
                 raise ValueError('Unknown scorer: {}'.format(scorer))
 
@@ -85,15 +78,6 @@ class FFM(BaseEstimator, ClassifierMixin):
                                    normalization=self.normalization)
         self._model = lib.ffm_init_model(problem, ffm_params)
 
-        best_model = None
-        score_index = -1
-        if scorer.maximum:
-            cmp = op.gt
-            score = -np.inf
-        else:
-            cmp = op.lt
-            score = np.inf
-
         # Training Process
         if val_X_y:
             logger.info('%-8s%-16s%-16s%-16s%-8s',
@@ -101,38 +85,31 @@ class FFM(BaseEstimator, ClassifierMixin):
         else:
             logger.info('%-8s%-16s%-16s%-8s', 'Iter', 'Train_Loss', 'Train_Score', 'Best_Iter')
 
-        log_loss = _scorers['log_loss']
+        best_score = -np.inf
         early_stopping = self.early_stopping
         for i in range(self.num_iter):
             lib.ffm_train_iteration(problem, self._model, ffm_params)
-            train_loss = self._score(problem, y, log_loss)
-            train_score = self._score(problem, y, scorer)
+            train_score = scorer(self, problem, y)
+            score = scorer(self, *val_X_y) if val_X_y else train_score
+            if best_score < score:
+                best_score = score
+                best_score_index = i
+
+            train_loss = - neg_log_loss(self, problem, y)
+            train_score *= scorer._sign
+            score *= scorer._sign
             if val_X_y:
-                val_score = self._score(*val_X_y, scorer)
+                logger.info('%-8d%-16.4f%-16.4f%-16.4f%-8d',
+                            i, train_loss, train_score, score, best_score_index)
             else:
-                val_score = train_score
+                logger.info('%-8d%-16.4f%-16.4f%-8d',
+                            i, train_loss, train_score, best_score_index)
 
-            if cmp(val_score, score):
-                score = val_score
-                score_index = i
-                best_model = self._model
-
-            if val_X_y:
-                logger.info('%-8d%-16.4f%-16.4f%-16.4f%-8d', i, train_loss, train_score, val_score, score_index)
-            else:
-                logger.info('%-8d%-16.4f%-16.4f%-8d', i, train_loss, train_score, score_index)
-
-            if (i - score_index) >= early_stopping:
+            if (i - best_score_index) >= early_stopping:
                 logger.info('Early stopping at %d rounds', i)
                 break
 
-            self._model = best_model
-
         return self
-
-    def _score(self, X, y, scorer):
-        predict = self.predict_proba if scorer.probabilities else self.predict
-        return scorer.metric(y, predict(X))
 
 
 def read_libffm(path):
