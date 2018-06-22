@@ -25,7 +25,7 @@ v: Value of each element in the problem
 
 namespace ffm {
 
-ffm_problem ffm_convert_data(ffm_line* data, ffm_int num_lines) {
+void ffm_init_problem(ffm_problem& prob, ffm_line* data, ffm_int num_lines) {
     ffm_float* Y = new ffm_float[num_lines];
     ffm_float* R = new ffm_float[num_lines];
     ffm_long* P = new ffm_long[num_lines + 1];
@@ -68,26 +68,18 @@ ffm_problem ffm_convert_data(ffm_line* data, ffm_int num_lines) {
         P[i + 1] = p;
         i++;
     }
-
-    ffm_problem result;
-    result.size = num_lines;
-
-    result.data = X;
-    result.num_nodes = num_nodes;
-    result.pos = P;
-
-    result.labels = Y;
-    result.scales = R;
-    result.n = n;
-    result.m = m;
-
-    return result;
+    prob.size = num_lines;
+    prob.data = X;
+    prob.num_nodes = num_nodes;
+    prob.pos = P;
+    prob.labels = Y;
+    prob.scales = R;
+    prob.n = n;
+    prob.m = m;
 }
 
-ffm_model ffm_init_model(ffm_problem& problem, ffm_parameter params) {
-    int n = problem.n;
-    int m = problem.m;
-    return init_model(n, m, params);
+ffm_model ffm_init_model(ffm_problem& prob, ffm_parameter params) {
+    return init_model(prob.n, prob.m, params);
 }
 
 ffm_float ffm_train_iteration(ffm_problem& prob, ffm_model& model, ffm_parameter params) {

@@ -65,6 +65,23 @@ class FFM_Problem(ctypes.Structure):
         ('n', ctypes.c_int),
         ('m', ctypes.c_int),
     ]
+
+    def __init__(self, X, y=it.repeat(0)):
+        lines = (FFM_Line * len(X))()
+        for line, row, label in zip(lines, X, y):
+            line.label = label
+            line.size = len(row)
+            line.data = (FFM_Node * line.size)()
+            for node, (f, j, v) in zip(line.data, row):
+                node.f = f
+                node.j = j
+                node.v = v
+        _lib.ffm_init_problem(self, lines, len(lines))
+
+    def __del__(self):
+        _lib.ffm_cleanup_problem(self)
+
+
 FFM_Problem_ptr = ctypes.POINTER(FFM_Problem)
 
 
@@ -72,8 +89,7 @@ path = os.path.dirname(os.path.abspath(__file__))
 lib_path = path + '/' + next(i for i in os.listdir(path) if i.endswith('.so'))
 _lib = ctypes.cdll.LoadLibrary(lib_path)
 
-_lib.ffm_convert_data.restype = FFM_Problem
-_lib.ffm_convert_data.argtypes = [FFM_Line_ptr, ctypes.c_int]
+_lib.ffm_init_problem.argtypes = [FFM_Problem_ptr, FFM_Line_ptr, ctypes.c_int]
 
 _lib.ffm_init_model.restype = FFM_Model
 _lib.ffm_init_model.argtypes = [FFM_Problem_ptr, FFM_Parameter]
@@ -95,19 +111,6 @@ _lib.ffm_save_model_c_string.argtypes = [FFM_Model_ptr, ctypes.c_char_p]
 _lib.ffm_cleanup_problem.argtypes = [FFM_Problem_ptr]
 
 _lib.ffm_cleanup_prediction.argtypes = [Float_ptr]
-
-
-def to_ffm_problem(X, y=it.repeat(0)):
-    lines = (FFM_Line * len(X))()
-    for line, row, label in zip(lines, X, y):
-        line.label = label
-        line.size = len(row)
-        line.data = (FFM_Node * line.size)()
-        for node, (f, j, v) in zip(line.data, row):
-            node.f = f
-            node.j = j
-            node.v = v
-    return _lib.ffm_convert_data(lines, len(lines))
 
 
 Scorer = namedtuple('Scorer', ['metric', 'maximum', 'probabilities'])
@@ -153,7 +156,7 @@ class FFM(BaseEstimator, ClassifierMixin):
         return (self.predict_proba(X) > 0.5).astype(np.uint8)
 
     def predict_proba(self, X):
-        problem = to_ffm_problem(X) if not isinstance(X, FFM_Problem) else X
+        problem = FFM_Problem(X) if not isinstance(X, FFM_Problem) else X
         pred_ptr = _lib.ffm_predict_batch(problem, self._model)
         try:
             pred_ptr_address = ctypes.addressof(pred_ptr.contents)
@@ -161,13 +164,11 @@ class FFM(BaseEstimator, ClassifierMixin):
             return np.ctypeslib.as_array(array_cast).copy()
         finally:
             _lib.ffm_cleanup_prediction(pred_ptr)
-            if problem is not X:
-                _lib.ffm_cleanup_problem(problem)
 
     def fit(self, X, y, val_X_y=None):
         """
-        :param X: feature data
-        :param y: target
+        :param X: training data as a sequence of (field, feature, value) triples
+        :param y: target as a len(X) sequence of values
         :param val_X_y: (X, y) data for validation
         """
         scorer = self.scorer
@@ -177,21 +178,10 @@ class FFM(BaseEstimator, ClassifierMixin):
             except KeyError:
                 raise ValueError('Unknown scorer: {}'.format(scorer))
 
-        val_problem = None
-        problem = to_ffm_problem(X, y)
-        try:
-            if val_X_y:
-                val_problem = to_ffm_problem(val_X_y[0])
-                val_X_y = (val_problem, val_X_y[1])
-            self._fit(problem, y, val_X_y, scorer)
-        finally:
-            _lib.ffm_cleanup_problem(problem)
-            if val_problem is not None:
-                _lib.ffm_cleanup_problem(val_problem)
+        problem = FFM_Problem(X, y)
+        if val_X_y:
+            val_X_y = (FFM_Problem(val_X_y[0]), val_X_y[1])
 
-        return self
-
-    def _fit(self, problem, y, val_X_y, scorer):
         ffm_params = FFM_Parameter(eta=self.eta, lam=self.lam, k=self.k,
                                    normalization=self.normalization)
         self._model = _lib.ffm_init_model(problem, ffm_params)
@@ -237,6 +227,8 @@ class FFM(BaseEstimator, ClassifierMixin):
                 break
 
             self._model = best_model
+
+        return self
 
     def _score(self, X, y, scorer):
         predict = self.predict_proba if scorer.probabilities else self.predict
