@@ -177,10 +177,14 @@ class FFM(BaseEstimator, ClassifierMixin):
         path_char = ctypes.c_char_p(path.encode())
         _lib.ffm_save_model_c_string(self._model, path_char)
 
-    def predict(self, ffm_data):
-        return (self.predict_proba(ffm_data) > 0.5).astype(np.uint8)
+    def predict(self, X):
+        return (self.predict_proba(X) > 0.5).astype(np.uint8)
 
-    def predict_proba(self, ffm_data):
+    def predict_proba(self, X):
+        if not isinstance(X, FFMData):
+            ffm_data = FFMData(X, np.zeros(len(X)))
+        else:
+            ffm_data = X
         pred_ptr = _lib.ffm_predict_batch(ffm_data._data, self._model)
         try:
             pred_ptr_address = ctypes.addressof(pred_ptr.contents)
@@ -189,16 +193,17 @@ class FFM(BaseEstimator, ClassifierMixin):
         finally:
             _lib.ffm_cleanup_prediction(pred_ptr)
 
-    def fit(self, X, y=None, val_data=None):
+    def fit(self, X, y, val_X_y=None):
         """
         :param X: feature data or FFMData format
         :param y: target
-        :param val_data: data for validation, list or FFMData format
+        :param val_X_y: (X, y) data for validation
         """
         params = self.get_params()
         ffm_params = FFM_Parameter(eta=params['eta'], lam=params['lam'], k=params['k'],
                                    normalization=params['normalization'])
-        train_data = X if isinstance(X, FFMData) else FFMData(X, y)
+
+        train_data = FFMData(X, y)
         self._model = _lib.ffm_init_model(train_data._data, ffm_params)
         scorer = params['scorer']
         if isinstance(scorer, str):
@@ -208,11 +213,11 @@ class FFM(BaseEstimator, ClassifierMixin):
                 raise ValueError('Unknown scorer: {}'.format(scorer))
 
         # Translate Validation Data
-        if val_data:
-            if not isinstance(val_data, FFMData):
-                val_data = FFMData(val_data[0], val_data[1])
+        if val_X_y:
+            val_data = FFMData(*val_X_y)
             print('%-8s%-16s%-16s%-16s%-8s' % ('Iter', 'Train_Loss', 'Train_Score', 'Val_Score', 'Best_Iter'))
         else:
+            val_data = None
             print('%-8s%-16s%-16s%-8s' % ('Iter', 'Train_Loss', 'Train_Score', 'Best_Iter'))
 
         # Score Recorder: > or <
