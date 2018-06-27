@@ -83,7 +83,9 @@ class FFM(BaseEstimator, ClassifierMixin):
             log_format = '%(i)-8d%(train_score)-16.4f%(best_score_index)-8d'
             logger.info('%-8s%-16s%-16s%-8s', 'Iter', 'Train_Loss', 'Train_Score', 'Best_Iter')
 
+        best_model = lib.ffm_init_model(problem, ffm_params)
         best_score = -np.inf
+        best_score_index = -1
         early_stopping = self.early_stopping
         for i in range(self.num_iter):
             lib.ffm_train_iteration(problem, self._model, ffm_params)
@@ -92,6 +94,9 @@ class FFM(BaseEstimator, ClassifierMixin):
             if best_score < score:
                 best_score = score
                 best_score_index = i
+                lib.ffm_copy_model(self._model, best_model)
+            else:
+                lib.ffm_copy_model(best_model, self._model)
 
             train_score *= scorer._sign
             score *= scorer._sign

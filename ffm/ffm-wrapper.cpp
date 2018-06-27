@@ -82,6 +82,11 @@ ffm_model ffm_init_model(ffm_problem& prob, ffm_parameter params) {
     return init_model(prob.n, prob.m, params);
 }
 
+void ffm_copy_model(ffm_model& src, ffm_model& dest) {
+    assert(src.n == dest.n && src.m == dest.m && src.k == dest.k);
+    memcpy(dest.W, src.W, get_w_size(src) * sizeof(ffm_float));
+}
+
 ffm_float ffm_train_iteration(ffm_problem& prob, ffm_model& model, ffm_parameter params) {
     ffm_double loss = 0;
 
