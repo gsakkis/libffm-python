@@ -17,7 +17,7 @@ srand = ctypes.CDLL('libc.so.6').srand
 class FFM(BaseEstimator, ClassifierMixin):
 
     def __init__(self, eta=0.2, lam=0.00002, k=4, normalization=True, num_iter=10, early_stopping=5,
-                 scorer='neg_log_loss', randomization=True):
+                 scorer='neg_log_loss', num_threads=1, randomization=True):
         """
         :param eta: learning rate
         :param lam: regularization parameter
@@ -28,7 +28,8 @@ class FFM(BaseEstimator, ClassifierMixin):
         :param scorer: an sklearn.metrics Scorer, or one of string keys in sklearn.metrics.SCORERS
         """
         self.set_params(eta=eta, lam=lam, k=k, normalization=normalization, num_iter=num_iter,
-                        early_stopping=early_stopping, scorer=scorer, randomization=randomization)
+                        early_stopping=early_stopping, scorer=scorer, num_threads=num_threads,
+                        randomization=randomization)
         self._model = None
 
     def read_model(self, path):
@@ -88,7 +89,7 @@ class FFM(BaseEstimator, ClassifierMixin):
         best_iter = 0
         early_stopping = self.early_stopping
         for i in range(1, self.num_iter + 1):
-            tr_logloss = lib.ffm_train_iteration(problem, self._model, ffm_params)
+            tr_logloss = lib.ffm_train_iteration(problem, self._model, ffm_params, self.num_threads)
             if not val_X_y:
                 logger.info('%-8d%-16.5f', i, tr_logloss)
             else:
