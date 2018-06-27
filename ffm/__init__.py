@@ -11,13 +11,13 @@ from ._wrapper import lib, FFM_Problem, FFM_Parameter
 
 
 logger = logging.getLogger('ffm')
-neg_log_loss = metrics.SCORERS['neg_log_loss']
+srand = ctypes.CDLL('libc.so.6').srand
 
 
 class FFM(BaseEstimator, ClassifierMixin):
 
     def __init__(self, eta=0.2, lam=0.00002, k=4, normalization=True, num_iter=10, early_stopping=5,
-                 scorer=neg_log_loss):
+                 scorer='neg_log_loss', randomization=True):
         """
         :param eta: learning rate
         :param lam: regularization parameter
@@ -28,7 +28,7 @@ class FFM(BaseEstimator, ClassifierMixin):
         :param scorer: an sklearn.metrics Scorer, or one of string keys in sklearn.metrics.SCORERS
         """
         self.set_params(eta=eta, lam=lam, k=k, normalization=normalization, num_iter=num_iter,
-                        early_stopping=early_stopping, scorer=scorer)
+                        early_stopping=early_stopping, scorer=scorer, randomization=randomization)
         self._model = None
 
     def read_model(self, path):
@@ -72,7 +72,10 @@ class FFM(BaseEstimator, ClassifierMixin):
 
         problem = FFM_Problem(X, y)
         ffm_params = FFM_Parameter(eta=self.eta, lam=self.lam, k=self.k,
-                                   normalization=self.normalization)
+                                   normalization=self.normalization,
+                                   randomization=self.randomization)
+        if self.randomization:
+            srand(1)
         self._model = lib.ffm_init_model(problem, ffm_params)
         if val_X_y:
             val_X_y = (FFM_Problem(val_X_y[0]), val_X_y[1])

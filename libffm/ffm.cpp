@@ -565,13 +565,15 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
 
         vector<ffm_int> outer_order(prob.meta.num_blocks);
         iota(outer_order.begin(), outer_order.end(), 0);
-        random_shuffle(outer_order.begin(), outer_order.end());
+        if (param.randomization)
+            random_shuffle(outer_order.begin(), outer_order.end());
         for(auto blk : outer_order) {
             ffm_int l = prob.load_block(blk);
 
             vector<ffm_int> inner_order(l);
             iota(inner_order.begin(), inner_order.end(), 0);
-            random_shuffle(inner_order.begin(), inner_order.end());
+            if (param.randomization)
+                random_shuffle(inner_order.begin(), inner_order.end());
 
 #if defined USEOMP
 #pragma omp parallel for schedule(static) reduction(+: loss)

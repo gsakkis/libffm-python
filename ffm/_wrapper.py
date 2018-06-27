@@ -22,6 +22,7 @@ class FFM_Parameter(Structure):
         ('nr_iters', ctypes.c_int),
         ('k', ctypes.c_int),
         ('normalization', ctypes.c_bool),
+        ('randomization', ctypes.c_bool),
         ('auto_stop', ctypes.c_bool),
     ]
 

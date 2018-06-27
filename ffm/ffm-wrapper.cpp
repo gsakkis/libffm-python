@@ -102,7 +102,8 @@ ffm_float ffm_train_iteration(ffm_problem& prob, ffm_model& model, ffm_parameter
         idx[i] = i;
     }
 
-    random_shuffle(&idx[0], &idx[len]);
+    if (params.randomization)
+        random_shuffle(&idx[0], &idx[len]);
 
     #if defined USEOMP
     #pragma omp parallel for schedule(static) reduction(+: loss)
