@@ -1,3 +1,9 @@
+# libffm artifacts
+ffm-train
+ffm-predict
+*.o
+*.bin
+
 # python artifacts
 __pycache__/
 ffm.egg-info/
