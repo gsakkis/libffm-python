@@ -11,13 +11,13 @@ from ._wrapper import lib, FFM_Problem, FFM_Parameter
 
 
 logger = logging.getLogger('ffm')
-neg_log_loss = metrics.SCORERS['neg_log_loss']
+srand = ctypes.CDLL('libc.so.6').srand
 
 
 class FFM(BaseEstimator, ClassifierMixin):
 
     def __init__(self, eta=0.2, lam=0.00002, k=4, normalization=True, num_iter=10, early_stopping=5,
-                 scorer=neg_log_loss):
+                 scorer='neg_log_loss', num_threads=1, randomization=True):
         """
         :param eta: learning rate
         :param lam: regularization parameter
@@ -28,7 +28,8 @@ class FFM(BaseEstimator, ClassifierMixin):
         :param scorer: an sklearn.metrics Scorer, or one of string keys in sklearn.metrics.SCORERS
         """
         self.set_params(eta=eta, lam=lam, k=k, normalization=normalization, num_iter=num_iter,
-                        early_stopping=early_stopping, scorer=scorer)
+                        early_stopping=early_stopping, scorer=scorer, num_threads=num_threads,
+                        randomization=randomization)
         self._model = None
 
     def read_model(self, path):
@@ -72,34 +73,38 @@ class FFM(BaseEstimator, ClassifierMixin):
 
         problem = FFM_Problem(X, y)
         ffm_params = FFM_Parameter(eta=self.eta, lam=self.lam, k=self.k,
-                                   normalization=self.normalization)
+                                   normalization=self.normalization,
+                                   randomization=self.randomization)
+        if self.randomization:
+            srand(1)
         self._model = lib.ffm_init_model(problem, ffm_params)
         if val_X_y:
             val_X_y = (FFM_Problem(val_X_y[0]), val_X_y[1])
-            log_format = '%(i)-8d%(train_score)-16.4f%(score)-16.4f%(best_score_index)-8d'
-            logger.info('%-8s%-16s%-16s%-16s%-8s',
-                        'Iter', 'Train_Loss', 'Train_Score', 'Val_Score', 'Best_Iter')
+            logger.info('%-8s%-16s%-16s', 'iter', 'tr_logloss', 'va_score')
         else:
-            log_format = '%(i)-8d%(train_score)-16.4f%(best_score_index)-8d'
-            logger.info('%-8s%-16s%-16s%-8s', 'Iter', 'Train_Loss', 'Train_Score', 'Best_Iter')
+            logger.info('%-8s%-16s', 'iter', 'tr_logloss')
 
-        best_score = -np.inf
+        best_model = lib.ffm_init_model(problem, ffm_params)
+        best_va_score = -np.inf
+        best_iter = 0
         early_stopping = self.early_stopping
-        for i in range(self.num_iter):
-            lib.ffm_train_iteration(problem, self._model, ffm_params)
-            train_score = scorer(self, problem, y)
-            score = scorer(self, *val_X_y) if val_X_y else train_score
-            if best_score < score:
-                best_score = score
-                best_score_index = i
-
-            train_score *= scorer._sign
-            score *= scorer._sign
-            logger.info(log_format, locals())
-            if (i - best_score_index) >= early_stopping:
-                logger.info('Early stopping at %d rounds', i)
-                break
-
+        for i in range(1, self.num_iter + 1):
+            tr_logloss = lib.ffm_train_iteration(problem, self._model, ffm_params, self.num_threads)
+            if not val_X_y:
+                logger.info('%-8d%-16.5f', i, tr_logloss)
+            else:
+                va_score = scorer(self, *val_X_y)
+                logger.info('%-8d%-16.5f%-16.5f', i, tr_logloss, abs(va_score))
+                if early_stopping:
+                    if va_score <= best_va_score:
+                        lib.ffm_copy_model(best_model, self._model)
+                        if i - best_iter >= early_stopping:
+                            logger.info('Auto-stop. Use model at %dth iteration', best_iter)
+                            break
+                    else:
+                        lib.ffm_copy_model(self._model, best_model)
+                        best_va_score = va_score
+                        best_iter = i
         return self
 
 

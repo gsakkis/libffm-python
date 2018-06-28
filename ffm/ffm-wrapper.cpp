@@ -82,7 +82,12 @@ ffm_model ffm_init_model(ffm_problem& prob, ffm_parameter params) {
     return init_model(prob.n, prob.m, params);
 }
 
-ffm_float ffm_train_iteration(ffm_problem& prob, ffm_model& model, ffm_parameter params) {
+void ffm_copy_model(ffm_model& src, ffm_model& dest) {
+    assert(src.n == dest.n && src.m == dest.m && src.k == dest.k);
+    memcpy(dest.W, src.W, get_w_size(src) * sizeof(ffm_float));
+}
+
+ffm_float ffm_train_iteration(ffm_problem& prob, ffm_model& model, ffm_parameter params, int num_threads) {
     ffm_double loss = 0;
 
     ffm_int len = prob.size;
@@ -97,10 +102,11 @@ ffm_float ffm_train_iteration(ffm_problem& prob, ffm_model& model, ffm_parameter
         idx[i] = i;
     }
 
-    random_shuffle(&idx[0], &idx[len]);
+    if (params.randomization)
+        random_shuffle(&idx[0], &idx[len]);
 
     #if defined USEOMP
-    #pragma omp parallel for schedule(static) reduction(+: loss)
+    #pragma omp parallel for num_threads(num_threads) schedule(static) reduction(+: loss)
     #endif
 
     for (ffm_int id = 0; id < len; id++) {
@@ -111,10 +117,10 @@ ffm_float ffm_train_iteration(ffm_problem& prob, ffm_model& model, ffm_parameter
         ffm_node *end = &X[P[i + 1]];
 
         ffm_float r = params.normalization ? R[i] : 1;
-        ffm_float t = wTx(begin, end, r, model);
+        ffm_double t = wTx(begin, end, r, model);
 
-        ffm_float expnyt = exp(-y * t);
-        loss = loss + log(1 + expnyt);
+        ffm_double expnyt = exp(-y * t);
+        loss += log1p(expnyt);
 
         ffm_float kappa = -y * expnyt / (1 + expnyt);
         wTx(begin, end, r, model, kappa, params.eta, params.lambda, true);

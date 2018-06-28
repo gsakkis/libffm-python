@@ -22,6 +22,7 @@ class FFM_Parameter(Structure):
         ('nr_iters', ctypes.c_int),
         ('k', ctypes.c_int),
         ('normalization', ctypes.c_bool),
+        ('randomization', ctypes.c_bool),
         ('auto_stop', ctypes.c_bool),
     ]
 
@@ -85,15 +86,18 @@ def setup_lib(lib_path=None):
         path = os.path.dirname(os.path.abspath(__file__))
         lib_path = path + '/' + next(i for i in os.listdir(path) if i.endswith('.so'))
 
-    lib = ctypes.cdll.LoadLibrary(lib_path)
+    lib = ctypes.CDLL(lib_path)
 
     lib.ffm_init_problem.argtypes = [FFM_Problem.pointer(), FFM_Line.pointer(), ctypes.c_int]
 
     lib.ffm_init_model.restype = FFM_Model
     lib.ffm_init_model.argtypes = [FFM_Problem.pointer(), FFM_Parameter]
 
+    lib.ffm_copy_model.argtypes = [FFM_Model.pointer(), FFM_Model.pointer()]
+
     lib.ffm_train_iteration.restype = ctypes.c_float
-    lib.ffm_train_iteration.argtypes = [FFM_Problem.pointer(), FFM_Model.pointer(), FFM_Parameter]
+    lib.ffm_train_iteration.argtypes = [FFM_Problem.pointer(), FFM_Model.pointer(), FFM_Parameter,
+                                        ctypes.c_int]
 
     lib.ffm_predict_array.restype = ctypes.c_float
     lib.ffm_predict_array.argtypes = [FFM_Node.pointer(), ctypes.c_int, FFM_Model.pointer()]
@@ -109,6 +113,7 @@ def setup_lib(lib_path=None):
     lib.ffm_cleanup_problem.argtypes = [FFM_Problem.pointer()]
 
     lib.ffm_cleanup_prediction.argtypes = [Float_ptr]
+
     return lib
 
 
