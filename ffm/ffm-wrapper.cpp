@@ -161,13 +161,6 @@ ffm_model ffm_load_model_c_string(char* path) {
     return ffm_load_model(str_path);
 }
 
-ffm_float ffm_predict_array(ffm_node* nodes, int len, ffm_model& model) {
-    ffm_node* begin = nodes;
-    ffm_node* end = begin + len;
-
-    return ffm_predict(begin, end, model);
-}
-
 void ffm_cleanup_prediction(ffm_float* f) {
     delete[] f;
 }

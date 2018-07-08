@@ -44,8 +44,6 @@ void ffm_copy_model(ffm_model& src, ffm_model &dest);
 
 ffm_float ffm_train_iteration(ffm_problem &data, ffm_model &model, ffm_parameter params, int num_threads);
 
-ffm_float ffm_predict_array(ffm_node *nodes, int len, ffm_model &model);
-
 ffm_float* ffm_predict_batch(ffm_problem &data, ffm_model &model);
 
 } // namespace ffm

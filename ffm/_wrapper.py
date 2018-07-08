@@ -99,9 +99,6 @@ def setup_lib(lib_path=None):
     lib.ffm_train_iteration.argtypes = [FFM_Problem.pointer(), FFM_Model.pointer(),
                                         FFM_Parameters, ctypes.c_int]
 
-    lib.ffm_predict_array.restype = ctypes.c_float
-    lib.ffm_predict_array.argtypes = [FFM_Node.pointer(), ctypes.c_int, FFM_Model.pointer()]
-
     lib.ffm_predict_batch.restype = Float_ptr
     lib.ffm_predict_batch.argtypes = [FFM_Problem.pointer(), FFM_Model.pointer()]
 
