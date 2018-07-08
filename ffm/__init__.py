@@ -7,7 +7,7 @@ import numpy as np
 from sklearn import metrics
 from sklearn.base import BaseEstimator, ClassifierMixin
 
-from ._wrapper import lib, FFM_Problem, FFM_Parameter
+from ._wrapper import lib, FFM_Problem, FFM_Parameters
 
 
 logger = logging.getLogger('ffm')
@@ -72,9 +72,7 @@ class FFM(BaseEstimator, ClassifierMixin):
                 raise ValueError('Unknown scorer: {}'.format(scorer))
 
         problem = FFM_Problem(X, y)
-        ffm_params = FFM_Parameter(eta=self.eta, lam=self.lam, k=self.k,
-                                   normalization=self.normalization,
-                                   randomization=self.randomization)
+        ffm_params = self._params
         if self.randomization:
             srand(1)
         self._model = lib.ffm_init_model(problem, ffm_params)
@@ -106,6 +104,12 @@ class FFM(BaseEstimator, ClassifierMixin):
                         best_va_score = va_score
                         best_iter = i
         return self
+
+    @property
+    def _params(self):
+        return FFM_Parameters(eta=self.eta, lam=self.lam, nr_iters=self.nr_iters, k=self.k,
+                              normalization=self.normalization, randomization=self.randomization,
+                              auto_stop=bool(self.early_stopping))
 
 
 def read_libffm(path):

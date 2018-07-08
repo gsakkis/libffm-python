@@ -15,7 +15,7 @@ class Structure(ctypes.Structure):
         return ctypes.POINTER(cls)
 
 
-class FFM_Parameter(Structure):
+class FFM_Parameters(Structure):
     _fields_ = [
         ('eta', ctypes.c_float),
         ('lam', ctypes.c_float),
@@ -91,13 +91,13 @@ def setup_lib(lib_path=None):
     lib.ffm_init_problem.argtypes = [FFM_Problem.pointer(), FFM_Line.pointer(), ctypes.c_int]
 
     lib.ffm_init_model.restype = FFM_Model
-    lib.ffm_init_model.argtypes = [FFM_Problem.pointer(), FFM_Parameter]
+    lib.ffm_init_model.argtypes = [FFM_Problem.pointer(), FFM_Parameters]
 
     lib.ffm_copy_model.argtypes = [FFM_Model.pointer(), FFM_Model.pointer()]
 
     lib.ffm_train_iteration.restype = ctypes.c_float
-    lib.ffm_train_iteration.argtypes = [FFM_Problem.pointer(), FFM_Model.pointer(), FFM_Parameter,
-                                        ctypes.c_int]
+    lib.ffm_train_iteration.argtypes = [FFM_Problem.pointer(), FFM_Model.pointer(),
+                                        FFM_Parameters, ctypes.c_int]
 
     lib.ffm_predict_array.restype = ctypes.c_float
     lib.ffm_predict_array.argtypes = [FFM_Node.pointer(), ctypes.c_int, FFM_Model.pointer()]
