@@ -58,14 +58,14 @@ class FFM_Model(Structure):
         return lib.ffm_load_model_c_string(py_to_c_str(path))
 
     @staticmethod
-    def train(params, training_path, validation_path=None, num_threads=1):
+    def train(params, training_path, validation_path=None, nr_threads=1):
         return lib.ffm_train_model(
             py_to_c_str(training_path),
             py_to_c_str(training_path + '.bin'),
             py_to_c_str(validation_path) if validation_path else None,
             py_to_c_str(validation_path + '.bin') if validation_path else None,
             params,
-            num_threads,
+            nr_threads,
         )
 
     def to_file(self, path):

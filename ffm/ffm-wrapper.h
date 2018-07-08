@@ -42,9 +42,9 @@ ffm_model ffm_init_model(ffm_problem &data, ffm_parameter params);
 
 void ffm_copy_model(ffm_model& src, ffm_model &dest);
 
-ffm_model ffm_train_model(char *tr_path, char *tr_bin_path, char *va_path, char *va_bin_path, ffm_parameter params, int num_threads);
+ffm_model ffm_train_model(char *tr_path, char *tr_bin_path, char *va_path, char *va_bin_path, ffm_parameter params, int nr_threads);
 
-ffm_float ffm_train_iteration(ffm_problem &data, ffm_model &model, ffm_parameter params, int num_threads);
+ffm_float ffm_train_iteration(ffm_problem &data, ffm_model &model, ffm_parameter params, int nr_threads);
 
 ffm_float* ffm_predict_batch(ffm_problem &data, ffm_model &model);
 

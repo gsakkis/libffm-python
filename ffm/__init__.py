@@ -15,7 +15,7 @@ logger = logging.getLogger('ffm')
 class FFM(BaseEstimator, ClassifierMixin):
 
     def __init__(self, eta=0.2, lam=0.00002, k=4, normalization=True, nr_iters=10, auto_stop=5,
-                 scorer='neg_log_loss', num_threads=1, randomization=True):
+                 scorer='neg_log_loss', nr_threads=1, randomization=True):
         """
         :param eta: learning rate
         :param lam: regularization parameter
@@ -26,7 +26,7 @@ class FFM(BaseEstimator, ClassifierMixin):
         :param scorer: an sklearn.metrics Scorer, or one of string keys in sklearn.metrics.SCORERS
         """
         self.set_params(eta=eta, lam=lam, k=k, normalization=normalization, nr_iters=nr_iters,
-                        auto_stop=auto_stop, scorer=scorer, num_threads=num_threads,
+                        auto_stop=auto_stop, scorer=scorer, nr_threads=nr_threads,
                         randomization=randomization)
         self._model = None
 
@@ -50,7 +50,7 @@ class FFM(BaseEstimator, ClassifierMixin):
 
     def fit_from_file(self, training_path, validation_path=None):
         self._model = FFM_Model.train(self._params, training_path, validation_path,
-                                      num_threads=self.num_threads)
+                                      nr_threads=self.nr_threads)
 
     def fit(self, X, y, val_X_y=None):
         """
@@ -81,7 +81,7 @@ class FFM(BaseEstimator, ClassifierMixin):
         best_iter = 0
         auto_stop = self.auto_stop
         for i in range(1, self.nr_iters + 1):
-            tr_logloss = lib.ffm_train_iteration(problem, self._model, ffm_params, self.num_threads)
+            tr_logloss = lib.ffm_train_iteration(problem, self._model, ffm_params, self.nr_threads)
             if not val_X_y:
                 logger.info('%-8d%-16.5f', i, tr_logloss)
             else:
