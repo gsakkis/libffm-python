@@ -14,7 +14,7 @@ logger = logging.getLogger('ffm')
 
 class FFM(BaseEstimator, ClassifierMixin):
 
-    def __init__(self, eta=0.2, lam=0.00002, k=4, normalization=True, nr_iters=10, early_stopping=5,
+    def __init__(self, eta=0.2, lam=0.00002, k=4, normalization=True, nr_iters=10, auto_stop=5,
                  scorer='neg_log_loss', num_threads=1, randomization=True):
         """
         :param eta: learning rate
@@ -22,11 +22,11 @@ class FFM(BaseEstimator, ClassifierMixin):
         :param k: number of latent factors
         :param normalization: enable/disable instance-wise normalization
         :param nr_iters: number of iterations
-        :param early_stopping: early stopping rounds
+        :param auto_stop: early stopping rounds
         :param scorer: an sklearn.metrics Scorer, or one of string keys in sklearn.metrics.SCORERS
         """
         self.set_params(eta=eta, lam=lam, k=k, normalization=normalization, nr_iters=nr_iters,
-                        early_stopping=early_stopping, scorer=scorer, num_threads=num_threads,
+                        auto_stop=auto_stop, scorer=scorer, num_threads=num_threads,
                         randomization=randomization)
         self._model = None
 
@@ -79,7 +79,7 @@ class FFM(BaseEstimator, ClassifierMixin):
         best_model = lib.ffm_init_model(problem, ffm_params)
         best_va_score = -np.inf
         best_iter = 0
-        early_stopping = self.early_stopping
+        auto_stop = self.auto_stop
         for i in range(1, self.nr_iters + 1):
             tr_logloss = lib.ffm_train_iteration(problem, self._model, ffm_params, self.num_threads)
             if not val_X_y:
@@ -87,10 +87,10 @@ class FFM(BaseEstimator, ClassifierMixin):
             else:
                 va_score = scorer(self, *val_X_y)
                 logger.info('%-8d%-16.5f%-16.5f', i, tr_logloss, abs(va_score))
-                if early_stopping:
+                if auto_stop:
                     if va_score <= best_va_score:
                         lib.ffm_copy_model(best_model, self._model)
-                        if i - best_iter >= early_stopping:
+                        if i - best_iter >= auto_stop:
                             logger.info('Auto-stop. Use model at %dth iteration', best_iter)
                             break
                     else:
@@ -103,7 +103,7 @@ class FFM(BaseEstimator, ClassifierMixin):
     def _params(self):
         return FFM_Parameters(eta=self.eta, lam=self.lam, nr_iters=self.nr_iters, k=self.k,
                               normalization=self.normalization, randomization=self.randomization,
-                              auto_stop=bool(self.early_stopping))
+                              auto_stop=bool(self.auto_stop))
 
 
 def read_libffm(path):
