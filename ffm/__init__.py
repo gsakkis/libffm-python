@@ -48,6 +48,10 @@ class FFM(BaseEstimator, ClassifierMixin):
 
     decision_function = predict_proba
 
+    def fit_from_file(self, training_path, validation_path=None):
+        self._model = FFM_Model.train(self._params, training_path, validation_path,
+                                      num_threads=self.num_threads)
+
     def fit(self, X, y, val_X_y=None):
         """
         :param X: training data as a sequence of (field, feature, value) triples

@@ -57,6 +57,17 @@ class FFM_Model(Structure):
     def from_file(path):
         return lib.ffm_load_model_c_string(py_to_c_str(path))
 
+    @staticmethod
+    def train(params, training_path, validation_path=None, num_threads=1):
+        return lib.ffm_train_model(
+            py_to_c_str(training_path),
+            py_to_c_str(training_path + '.bin'),
+            py_to_c_str(validation_path) if validation_path else None,
+            py_to_c_str(validation_path + '.bin') if validation_path else None,
+            params,
+            num_threads,
+        )
+
     def to_file(self, path):
         lib.ffm_save_model_c_string(self, py_to_c_str(path))
 
@@ -118,6 +129,11 @@ def setup_lib(lib_path=None):
     lib.ffm_init_model.argtypes = [FFM_Problem.pointer(), FFM_Parameters]
 
     lib.ffm_copy_model.argtypes = [FFM_Model.pointer(), FFM_Model.pointer()]
+
+    lib.ffm_train_model.restype = FFM_Model
+    lib.ffm_train_model.argtypes = [ctypes.c_char_p, ctypes.c_char_p,
+                                    ctypes.c_char_p, ctypes.c_char_p,
+                                    FFM_Parameters, ctypes.c_int]
 
     lib.ffm_train_iteration.restype = ctypes.c_float
     lib.ffm_train_iteration.argtypes = [FFM_Problem.pointer(), FFM_Model.pointer(),

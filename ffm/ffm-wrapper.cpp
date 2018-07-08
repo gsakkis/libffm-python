@@ -87,6 +87,19 @@ void ffm_copy_model(ffm_model& src, ffm_model& dest) {
     memcpy(dest.W, src.W, get_w_size(src) * sizeof(ffm_float));
 }
 
+ffm_model ffm_train_model(char* tr_path, char *tr_bin_path, char *va_path, char *va_bin_path, ffm_parameter params, int num_threads) {
+    string va_bin_path_str;
+    ffm_read_problem_to_disk(tr_path, tr_bin_path);
+    if (va_path && va_bin_path) {
+        va_bin_path_str = va_bin_path;
+        ffm_read_problem_to_disk(va_path, va_bin_path_str);
+    }
+#if defined USEOMP
+    omp_set_num_threads(num_threads);
+#endif
+    return ffm_train_on_disk(tr_bin_path, va_bin_path_str, params);
+}
+
 ffm_float ffm_train_iteration(ffm_problem& prob, ffm_model& model, ffm_parameter params, int num_threads) {
     ffm_double loss = 0;
 
