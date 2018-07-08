@@ -4,8 +4,16 @@ import os
 import ctypes
 import itertools as it
 
+import numpy as np
+
 
 Float_ptr = ctypes.POINTER(ctypes.c_float)
+
+
+def py_to_c_str(string):
+    if isinstance(string, str):
+        string = string.encode()
+    return ctypes.c_char_p(string)
 
 
 class Structure(ctypes.Structure):
@@ -35,6 +43,22 @@ class FFM_Model(Structure):
         ('W', Float_ptr),
         ('normalization', ctypes.c_bool)
     ]
+
+    def predict_batch(self, problem):
+        pred_ptr = lib.ffm_predict_batch(problem, self)
+        try:
+            pred_ptr_address = ctypes.addressof(pred_ptr.contents)
+            array_cast = (ctypes.c_float * problem.size).from_address(pred_ptr_address)
+            return np.ctypeslib.as_array(array_cast).copy()
+        finally:
+            lib.ffm_cleanup_prediction(pred_ptr)
+
+    @staticmethod
+    def from_file(path):
+        return lib.ffm_load_model_c_string(py_to_c_str(path))
+
+    def to_file(self, path):
+        lib.ffm_save_model_c_string(self, py_to_c_str(path))
 
 
 class FFM_Node(Structure):
@@ -115,3 +139,4 @@ def setup_lib(lib_path=None):
 
 
 lib = setup_lib()
+srand = ctypes.CDLL('libc.so.6').srand

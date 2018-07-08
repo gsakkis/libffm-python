@@ -1,17 +1,15 @@
 __all__ = ['FFM', 'read_libffm']
 
-import ctypes
 import logging
 
 import numpy as np
 from sklearn import metrics
 from sklearn.base import BaseEstimator, ClassifierMixin
 
-from ._wrapper import lib, FFM_Problem, FFM_Parameters
+from ._wrapper import lib, srand, FFM_Model, FFM_Parameters, FFM_Problem
 
 
 logger = logging.getLogger('ffm')
-srand = ctypes.CDLL('libc.so.6').srand
 
 
 class FFM(BaseEstimator, ClassifierMixin):
@@ -33,28 +31,20 @@ class FFM(BaseEstimator, ClassifierMixin):
         self._model = None
 
     def read_model(self, path):
-        path_char = ctypes.c_char_p(path.encode())
-        self._model = lib.ffm_load_model_c_string(path_char)
+        self._model = FFM_Model.from_file(path)
         return self
 
     def save_model(self, path):
         if self._model is None:
             raise ValueError('Model has not been trained')
-        path_char = ctypes.c_char_p(path.encode())
-        lib.ffm_save_model_c_string(self._model, path_char)
+        self._model.to_file(path)
 
     def predict(self, X):
         return (self.predict_proba(X) > 0.5).astype(np.uint8)
 
     def predict_proba(self, X):
         problem = FFM_Problem(X) if not isinstance(X, FFM_Problem) else X
-        pred_ptr = lib.ffm_predict_batch(problem, self._model)
-        try:
-            pred_ptr_address = ctypes.addressof(pred_ptr.contents)
-            array_cast = (ctypes.c_float * problem.size).from_address(pred_ptr_address)
-            return np.ctypeslib.as_array(array_cast).copy()
-        finally:
-            lib.ffm_cleanup_prediction(pred_ptr)
+        return self._model.predict_batch(problem)
 
     decision_function = predict_proba
 
