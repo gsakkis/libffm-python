@@ -39,9 +39,6 @@ class FFM(BaseEstimator, ClassifierMixin):
             raise ValueError('Model has not been trained')
         self._model.to_file(path)
 
-    def predict(self, X):
-        return (self.predict_proba(X) > 0.5).astype(np.uint8)
-
     def predict_proba(self, X):
         problem = FFM_Problem(X) if not isinstance(X, FFM_Problem) else X
         return self._model.predict_batch(problem)
