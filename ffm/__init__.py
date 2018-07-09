@@ -6,7 +6,7 @@ import numpy as np
 from sklearn import metrics
 from sklearn.base import BaseEstimator, ClassifierMixin
 
-from ._wrapper import lib, srand, FFM_Model, FFM_Parameters, FFM_Problem
+from ._wrapper import srand, FFM_Model, FFM_Parameters, FFM_Problem
 
 
 logger = logging.getLogger('ffm')
@@ -46,8 +46,7 @@ class FFM(BaseEstimator, ClassifierMixin):
     decision_function = predict_proba
 
     def fit_from_file(self, training_path, validation_path=None):
-        self._model = FFM_Model.train(self._params, training_path, validation_path,
-                                      nr_threads=self.nr_threads)
+        self._model = FFM_Model.train(training_path, validation_path, self._params, self.nr_threads)
 
     def fit(self, X, y, val_X_y=None):
         """
@@ -66,19 +65,19 @@ class FFM(BaseEstimator, ClassifierMixin):
         ffm_params = self._params
         if self.randomization:
             srand(1)
-        self._model = lib.ffm_init_model(problem, ffm_params)
+        self._model = FFM_Model(problem, ffm_params)
         if val_X_y:
             val_X_y = (FFM_Problem(val_X_y[0]), val_X_y[1])
             logger.info('%-8s%-16s%-16s', 'iter', 'tr_logloss', 'va_score')
         else:
             logger.info('%-8s%-16s', 'iter', 'tr_logloss')
 
-        best_model = lib.ffm_init_model(problem, ffm_params)
+        best_model = FFM_Model(problem, ffm_params)
         best_va_score = -np.inf
         best_iter = 0
         auto_stop = self.auto_stop
         for i in range(1, self.nr_iters + 1):
-            tr_logloss = lib.ffm_train_iteration(problem, self._model, ffm_params, self.nr_threads)
+            tr_logloss = self._model.train_iteration(problem, ffm_params, self.nr_threads)
             if not val_X_y:
                 logger.info('%-8d%-16.5f', i, tr_logloss)
             else:
@@ -86,12 +85,12 @@ class FFM(BaseEstimator, ClassifierMixin):
                 logger.info('%-8d%-16.5f%-16.5f', i, tr_logloss, abs(va_score))
                 if auto_stop:
                     if va_score <= best_va_score:
-                        lib.ffm_copy_model(best_model, self._model)
+                        best_model.copy_to(self._model)
                         if i - best_iter >= auto_stop:
                             logger.info('Auto-stop. Use model at %dth iteration', best_iter)
                             break
                     else:
-                        lib.ffm_copy_model(self._model, best_model)
+                        self._model.copy_to(best_model)
                         best_va_score = va_score
                         best_iter = i
         return self

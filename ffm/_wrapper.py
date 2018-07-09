@@ -44,21 +44,23 @@ class FFM_Model(Structure):
         ('normalization', ctypes.c_bool)
     ]
 
-    def predict_batch(self, problem):
-        pred_ptr = lib.ffm_predict_batch(problem, self)
-        try:
-            pred_ptr_address = ctypes.addressof(pred_ptr.contents)
-            array_cast = (ctypes.c_float * problem.size).from_address(pred_ptr_address)
-            return np.ctypeslib.as_array(array_cast).copy()
-        finally:
-            lib.ffm_cleanup_prediction(pred_ptr)
+    def __init__(self, problem, params):
+        temp_model = lib.ffm_init_model(problem, params)
+        for attr, _ in self._fields_:
+            setattr(self, attr, getattr(temp_model, attr))
 
     @staticmethod
     def from_file(path):
         return lib.ffm_load_model_c_string(py_to_c_str(path))
 
+    def to_file(self, path):
+        lib.ffm_save_model_c_string(self, py_to_c_str(path))
+
+    def copy_to(self, other):
+        return lib.ffm_copy_model(self, other)
+
     @staticmethod
-    def train(params, training_path, validation_path=None, nr_threads=1):
+    def train(training_path, validation_path, params, nr_threads=1):
         return lib.ffm_train_model(
             py_to_c_str(training_path),
             py_to_c_str(training_path + '.bin'),
@@ -68,8 +70,17 @@ class FFM_Model(Structure):
             nr_threads,
         )
 
-    def to_file(self, path):
-        lib.ffm_save_model_c_string(self, py_to_c_str(path))
+    def train_iteration(self, problem, params, nr_threads=1):
+        return lib.ffm_train_iteration(problem, self, params, nr_threads)
+
+    def predict_batch(self, problem):
+        pred_ptr = lib.ffm_predict_batch(problem, self)
+        try:
+            pred_ptr_address = ctypes.addressof(pred_ptr.contents)
+            array_cast = (ctypes.c_float * problem.size).from_address(pred_ptr_address)
+            return np.ctypeslib.as_array(array_cast).copy()
+        finally:
+            lib.ffm_cleanup_prediction(pred_ptr)
 
 
 class FFM_Node(Structure):
