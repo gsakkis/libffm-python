@@ -30,7 +30,7 @@ setup(
         )
     ],
     zip_safe=False,
-    install_requires=['numpy', 'click'],
+    install_requires=['numpy', 'sklearn', 'click'],
     entry_points='''
         [console_scripts]
         ffm=ffm.cli:cli
