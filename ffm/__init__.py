@@ -4,7 +4,7 @@ import logging
 
 import numpy as np
 from sklearn import metrics
-from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.base import BaseEstimator
 
 from ._wrapper import srand, FFM_Model, FFM_Parameters, FFM_Problem
 
@@ -12,7 +12,7 @@ from ._wrapper import srand, FFM_Model, FFM_Parameters, FFM_Problem
 logger = logging.getLogger('ffm')
 
 
-class FFM(BaseEstimator, ClassifierMixin):
+class FFM(BaseEstimator):
 
     def __init__(self, eta=0.2, lam=0.00002, k=4, normalization=True, nr_iters=10, auto_stop=5,
                  score='neg_log_loss', nr_threads=1, randomization=True):

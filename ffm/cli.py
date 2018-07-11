@@ -1,5 +1,5 @@
 import logging
-from click import group, command, option, argument, File, Path
+from click import group, command, option, argument, echo, File, Path
 from ffm import FFM, read_libffm
 
 
@@ -63,15 +63,18 @@ def train(training_file, validation_file, **kwargs):
 
 
 @cli.command()
-@argument('model_file', type=Path(exists=True, dir_okay=False))
 @argument('test_file', type=Path(exists=True, dir_okay=False))
+@argument('model_file', type=Path(exists=True, dir_okay=False))
 @argument('output_file', type=File('w'), required=False)
-def predict(model_file, test_file, output_file):
+def predict(test_file, model_file, output_file):
     """Use a trained FFM model to make predictions"""
     model = FFM().read_model(model_file)
     test_X, test_y = read_libffm(test_file)
-    for p in model.predict_proba(test_X):
-        print('{:.6g}'.format(p), file=output_file)
+    test_score = abs(model.scorer(model, test_X, test_y))
+    echo("{} = {:.5g}".format(model.score, test_score))
+    if output_file:
+        for p in model.predict_proba(test_X):
+            print('{:.6g}'.format(p), file=output_file)
 
 
 if __name__ == '__main__':
