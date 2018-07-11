@@ -48,7 +48,7 @@ def train(training_file, validation_file, **kwargs):
         eta=kwargs['eta'],
         nr_iters=kwargs['iterations'],
         auto_stop=kwargs['auto_stop'],
-        scorer=kwargs['score'],
+        score=kwargs['score'],
         nr_threads=kwargs['threads'],
         normalization=kwargs['norm'],
         randomization=kwargs['rand'],

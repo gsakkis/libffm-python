@@ -15,7 +15,7 @@ logger = logging.getLogger('ffm')
 class FFM(BaseEstimator, ClassifierMixin):
 
     def __init__(self, eta=0.2, lam=0.00002, k=4, normalization=True, nr_iters=10, auto_stop=5,
-                 scorer='neg_log_loss', nr_threads=1, randomization=True):
+                 score='neg_log_loss', nr_threads=1, randomization=True):
         """
         :param eta: learning rate
         :param lam: regularization parameter
@@ -23,10 +23,10 @@ class FFM(BaseEstimator, ClassifierMixin):
         :param normalization: enable/disable instance-wise normalization
         :param nr_iters: number of iterations
         :param auto_stop: early stopping rounds
-        :param scorer: an sklearn.metrics Scorer, or one of string keys in sklearn.metrics.SCORERS
+        :param score: an sklearn.metrics Scorer, or one of string keys in sklearn.metrics.SCORERS
         """
         self.set_params(eta=eta, lam=lam, k=k, normalization=normalization, nr_iters=nr_iters,
-                        auto_stop=auto_stop, scorer=scorer, nr_threads=nr_threads,
+                        auto_stop=auto_stop, score=score, nr_threads=nr_threads,
                         randomization=randomization)
         self._model = None
 
@@ -54,13 +54,6 @@ class FFM(BaseEstimator, ClassifierMixin):
         :param y: target as a len(X) sequence of values
         :param val_X_y: (X, y) data for validation
         """
-        scorer = self.scorer
-        if isinstance(scorer, str):
-            try:
-                scorer = metrics.SCORERS[scorer]
-            except KeyError:
-                raise ValueError('Unknown scorer: {}'.format(scorer))
-
         problem = FFM_Problem(X, y)
         ffm_params = self._params
         if self.randomization:
@@ -81,7 +74,7 @@ class FFM(BaseEstimator, ClassifierMixin):
             if not val_X_y:
                 logger.info('%-8d%-16.5f', i, tr_logloss)
             else:
-                va_score = scorer(self, *val_X_y)
+                va_score = self.scorer(self, *val_X_y)
                 logger.info('%-8d%-16.5f%-16.5f', i, tr_logloss, abs(va_score))
                 if auto_stop:
                     if va_score <= best_va_score:
@@ -94,6 +87,16 @@ class FFM(BaseEstimator, ClassifierMixin):
                         best_va_score = va_score
                         best_iter = i
         return self
+
+    @property
+    def scorer(self):
+        score = self.score
+        if isinstance(score, str):
+            try:
+                return metrics.SCORERS[score]
+            except KeyError:
+                raise ValueError('Unknown score: {}'.format(score))
+        return score
 
     @property
     def _params(self):
