@@ -41,7 +41,7 @@ setup(
         )
     ],
     zip_safe=False,
-    install_requires=['numpy', 'sklearn', 'click'],
+    install_requires=['numpy', 'scikit-learn[alldeps]', 'click'],
     entry_points='''
         [console_scripts]
         ffm=ffm.cli:cli
