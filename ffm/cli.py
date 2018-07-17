@@ -74,7 +74,7 @@ def predict(test_file, model_file, output_file):
     echo("{} = {:.5g}".format(model.score, test_score))
     if output_file:
         for p in model.predict_proba(test_X):
-            print('{:.6g}'.format(p), file=output_file)
+            output_file.write('{:.6g}\n'.format(p))
 
 
 if __name__ == '__main__':

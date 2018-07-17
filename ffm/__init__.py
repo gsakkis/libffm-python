@@ -91,7 +91,7 @@ class FFM(BaseEstimator):
     @property
     def scorer(self):
         score = self.score
-        if isinstance(score, str):
+        if not callable(score):
             try:
                 return metrics.SCORERS[score]
             except KeyError:
