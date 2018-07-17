@@ -1,18 +1,30 @@
 import sys
 from setuptools import setup, Extension
+from setuptools.command.build_ext import build_ext
 
-USEOMP = True
-USESSE = True
 
-extra_compile_args = ['-O3', '-std=c++0x', '-march=native']
-extra_link_args = []
-if USEOMP:
-    extra_compile_args.extend(['-fopenmp', '-DUSEOMP'])
-    extra_link_args.append('-fopenmp')
-if USESSE:
-    extra_compile_args.append('-DUSESSE')
-if sys.platform.startswith('win32'):
-    extra_compile_args.append('-D_WIN32')
+class BuildLibFFM(build_ext):
+
+    user_options = build_ext.user_options + [
+        ('omp', None, 'use OpenMP'),
+        ('sse', None, 'use SSE instructions'),
+    ]
+    boolean_options = build_ext.boolean_options + ['omp', 'sse']
+
+    def initialize_options(self):
+        build_ext.initialize_options(self)
+        self.omp = self.sse = 0
+
+    def build_extension(self, ext):
+        if self.omp:
+            ext.extra_compile_args.extend(['-fopenmp', '-DUSEOMP'])
+            ext.extra_link_args.append('-fopenmp')
+        if self.sse:
+            ext.extra_compile_args.extend(['-march=native', '-DUSESSE'])
+        if sys.platform.startswith('win32'):
+            ext.extra_compile_args.append('-D_WIN32')
+        build_ext.build_extension(self, ext)
+
 
 setup(
     name='ffm',
@@ -20,13 +32,12 @@ setup(
     description='Python wrapper for LibFFM',
     url='https://github.com/gsakkis/libffm-python',
     packages=['ffm'],
+    cmdclass={'build_ext': BuildLibFFM},
     ext_modules=[
         Extension(
             name='ffm._libffm',
             sources=['ffm/ffm-wrapper.cpp', 'libffm/timer.cpp'],
             include_dirs=['libffm'],
-            extra_compile_args=extra_compile_args,
-            extra_link_args=extra_link_args,
         )
     ],
     zip_safe=False,
