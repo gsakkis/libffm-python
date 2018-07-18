@@ -16,6 +16,7 @@ class BuildLibFFM(build_ext):
         self.omp = self.sse = 0
 
     def build_extension(self, ext):
+        ext.extra_compile_args.append('-std=c++11')
         if self.omp:
             ext.extra_compile_args.extend(['-fopenmp', '-DUSEOMP'])
             ext.extra_link_args.append('-fopenmp')
