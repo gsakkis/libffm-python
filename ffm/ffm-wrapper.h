@@ -34,8 +34,6 @@ void ffm_save_model_c_string(ffm_model &model, char *path);
 
 void ffm_init_problem(ffm_problem &p, ffm_line *data, ffm_int num_lines);
 
-void ffm_cleanup_prediction(ffm_float *f);
-
 void ffm_cleanup_problem(ffm_problem &p);
 
 ffm_model ffm_init_model(ffm_problem &data, ffm_parameter params);
@@ -46,7 +44,7 @@ ffm_model ffm_train_model(char *tr_path, char *tr_bin_path, char *va_path, char 
 
 ffm_float ffm_train_iteration(ffm_problem &data, ffm_model &model, ffm_parameter params, int nr_threads);
 
-ffm_float* ffm_predict_batch(ffm_problem &data, ffm_model &model);
+void ffm_predict_batch(ffm_float *result, ffm_problem &data, ffm_model &model);
 
 } // namespace ffm
 }

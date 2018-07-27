@@ -74,13 +74,9 @@ class FFM_Model(Structure):
         return lib.ffm_train_iteration(problem, self, params, nr_threads)
 
     def predict_batch(self, problem):
-        pred_ptr = lib.ffm_predict_batch(problem, self)
-        try:
-            pred_ptr_address = ctypes.addressof(pred_ptr.contents)
-            array_cast = (ctypes.c_float * problem.size).from_address(pred_ptr_address)
-            return np.ctypeslib.as_array(array_cast).copy()
-        finally:
-            lib.ffm_cleanup_prediction(pred_ptr)
+        predictions = np.empty((problem.size,), dtype=np.float32)
+        lib.ffm_predict_batch(predictions, problem, self)
+        return predictions
 
 
 class FFM_Node(Structure):
@@ -150,8 +146,9 @@ def setup_lib(lib_path=None):
     lib.ffm_train_iteration.argtypes = [FFM_Problem.pointer(), FFM_Model.pointer(),
                                         FFM_Parameters, ctypes.c_int]
 
-    lib.ffm_predict_batch.restype = Float_ptr
-    lib.ffm_predict_batch.argtypes = [FFM_Problem.pointer(), FFM_Model.pointer()]
+    lib.ffm_predict_batch.argtypes = [np.ctypeslib.ndpointer(dtype=np.float32, ndim=1,
+                                                             flags='C_CONTIGUOUS'),
+                                      FFM_Problem.pointer(), FFM_Model.pointer()]
 
     lib.ffm_load_model_c_string.restype = FFM_Model
     lib.ffm_load_model_c_string.argtypes = [ctypes.c_char_p]
@@ -159,8 +156,6 @@ def setup_lib(lib_path=None):
     lib.ffm_save_model_c_string.argtypes = [FFM_Model.pointer(), ctypes.c_char_p]
 
     lib.ffm_cleanup_problem.argtypes = [FFM_Problem.pointer()]
-
-    lib.ffm_cleanup_prediction.argtypes = [Float_ptr]
 
     return lib
 

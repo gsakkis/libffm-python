@@ -143,15 +143,12 @@ ffm_float ffm_train_iteration(ffm_problem& prob, ffm_model& model, ffm_parameter
     return loss / len;
 }
 
-ffm_float* ffm_predict_batch(ffm_problem& prob, ffm_model& model) {
+void ffm_predict_batch(ffm_float* result, ffm_problem& prob, ffm_model& model) {
     ffm_node* X = prob.data;
     ffm_float* R = prob.scales;
     ffm_long* P = prob.pos;
-    ffm_int len = prob.size;
 
-    ffm_float* result = new float[len];
-
-    for (ffm_int i = 0; i < len; i++) {
+    for (ffm_int i = 0; i < prob.size; i++) {
         ffm_node *begin = &X[P[i]];
         ffm_node *end = &X[P[i + 1]];
 
@@ -160,8 +157,6 @@ ffm_float* ffm_predict_batch(ffm_problem& prob, ffm_model& model) {
 
         result[i] = 1 / (1 + exp(-t));
     }
-
-    return result;
 }
 
 void ffm_save_model_c_string(ffm_model& model, char* path) {
@@ -172,10 +167,6 @@ void ffm_save_model_c_string(ffm_model& model, char* path) {
 ffm_model ffm_load_model_c_string(char* path) {
     string str_path(path);
     return ffm_load_model(str_path);
-}
-
-void ffm_cleanup_prediction(ffm_float* f) {
-    delete[] f;
 }
 
 void ffm_cleanup_problem(ffm_problem& prob) {
