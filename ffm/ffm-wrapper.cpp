@@ -78,10 +78,6 @@ void ffm_init_problem(ffm_problem& prob, ffm_line* data, ffm_int num_lines) {
     prob.m = m;
 }
 
-ffm_model ffm_init_model(ffm_problem& prob, ffm_parameter params) {
-    return init_model(prob.n, prob.m, params);
-}
-
 void ffm_copy_model(ffm_model& src, ffm_model& dest) {
     assert(src.n == dest.n && src.m == dest.m && src.k == dest.k);
     memcpy(dest.W, src.W, get_w_size(src) * sizeof(ffm_float));

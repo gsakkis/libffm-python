@@ -45,9 +45,11 @@ class FFM_Model(Structure):
     ]
 
     def __init__(self, problem, params):
-        temp_model = lib.ffm_init_model(problem, params)
-        for attr, _ in self._fields_:
-            setattr(self, attr, getattr(temp_model, attr))
+        self.n = problem.n
+        self.m = problem.m
+        self.k = params.k
+        self.normalization = params.normalization
+        lib.ffm_init_model_weights(self)
 
     @staticmethod
     def from_file(path):
@@ -132,8 +134,7 @@ def setup_lib(lib_path=None):
 
     lib.ffm_init_problem.argtypes = [FFM_Problem.pointer(), FFM_Line.pointer(), ctypes.c_int]
 
-    lib.ffm_init_model.restype = FFM_Model
-    lib.ffm_init_model.argtypes = [FFM_Problem.pointer(), FFM_Parameters]
+    lib.ffm_init_model_weights.argtypes = [FFM_Model.pointer()]
 
     lib.ffm_copy_model.argtypes = [FFM_Model.pointer(), FFM_Model.pointer()]
 

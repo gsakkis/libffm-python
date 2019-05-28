@@ -261,40 +261,6 @@ ffm_float* malloc_aligned_float(ffm_long size)
     return (ffm_float*)ptr;
 }
 
-ffm_model init_model(ffm_int n, ffm_int m, ffm_parameter param)
-{
-    ffm_model model;
-    model.n = n;
-    model.k = param.k;
-    model.m = m;
-    model.W = nullptr;
-    model.normalization = param.normalization;
-
-    ffm_int k_aligned = get_k_aligned(model.k);
-    
-    model.W = malloc_aligned_float((ffm_long)n*m*k_aligned*2);
-
-    ffm_float coef = 1.0f / sqrt(model.k);
-    ffm_float *w = model.W;
-
-    default_random_engine generator;
-    uniform_real_distribution<ffm_float> distribution(0.0, 1.0);
-
-    for(ffm_int j = 0; j < model.n; j++) {
-        for(ffm_int f = 0; f < model.m; f++) {
-            for(ffm_int d = 0; d < k_aligned;) {
-                for(ffm_int s = 0; s < kALIGN; s++, w++, d++) {
-                    w[0] = (d < model.k)? coef * distribution(generator) : 0.0;
-                    w[kALIGN] = 1;
-                }
-                w += kALIGN;
-            }
-        }
-    }
-
-    return model;
-}
-
 struct disk_problem_meta {
     ffm_int n = 0;
     ffm_int m = 0;
@@ -497,6 +463,33 @@ bool check_same_txt_bin(string txt_path, string bin_path) {
 
 } // unnamed namespace
 
+void ffm_init_model_weights(ffm_model &model) {
+    ffm_int k_aligned = get_k_aligned(model.k);
+    model.W = malloc_aligned_float((ffm_long)model.n * model.m * k_aligned * 2);
+
+    ffm_float coef = 1.0f / sqrt(model.k);
+    ffm_float *w = model.W;
+
+    default_random_engine generator;
+    uniform_real_distribution<ffm_float> distribution(0.0, 1.0);
+
+    for(ffm_int j = 0; j < model.n; j++) {
+        for(ffm_int f = 0; f < model.m; f++) {
+            for(ffm_int d = 0; d < k_aligned;) {
+                for(ffm_int s = 0; s < kALIGN; s++, w++, d++) {
+                    w[0] = (d < model.k)? coef * distribution(generator) : 0.0;
+                    w[kALIGN] = 1;
+                }
+                w += kALIGN;
+            }
+        }
+    }
+}
+
+ffm_model::ffm_model(ffm_int n, ffm_int m, ffm_int k, bool normalization) : n(n), m(m), k(k), normalization(normalization) {
+    ffm_init_model_weights(*this);
+}
+
 ffm_model::~ffm_model() {
     if(W != nullptr) {
 #ifndef USESSE
@@ -534,7 +527,7 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
     problem_on_disk tr(tr_path);
     problem_on_disk va(va_path);
 
-    ffm_model model = init_model(tr.meta.n, tr.meta.m, param);
+    ffm_model model(tr.meta.n, tr.meta.m, param.k, param.normalization);
 
     bool auto_stop = param.auto_stop && !va_path.empty();
 

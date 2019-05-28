@@ -24,6 +24,9 @@ struct ffm_model {
     ffm_int k; // number of latent factors
     ffm_float *W = nullptr;
     bool normalization;
+
+    ffm_model() {};
+    ffm_model(ffm_int n, ffm_int m, ffm_int k, bool normalization);
     ~ffm_model();
 };
 
@@ -36,6 +39,8 @@ struct ffm_parameter {
     bool randomization = true;
     bool auto_stop = false;
 };
+
+void ffm_init_model_weights(ffm_model &model);
 
 void ffm_read_problem_to_disk(string txt_path, string bin_path);
 
