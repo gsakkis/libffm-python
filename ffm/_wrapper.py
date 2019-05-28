@@ -51,6 +51,9 @@ class FFM_Model(Structure):
         self.normalization = params.normalization
         lib.ffm_init_model_weights(self)
 
+    def __del__(self):
+        lib.ffm_cleanup_model_weights(self)
+
     @staticmethod
     def from_file(path):
         return lib.ffm_load_model_c_string(py_to_c_str(path))
@@ -135,6 +138,8 @@ def setup_lib(lib_path=None):
     lib.ffm_init_problem.argtypes = [FFM_Problem.pointer(), FFM_Line.pointer(), ctypes.c_int]
 
     lib.ffm_init_model_weights.argtypes = [FFM_Model.pointer()]
+
+    lib.ffm_cleanup_model_weights.argtypes = [FFM_Model.pointer()]
 
     lib.ffm_copy_model.argtypes = [FFM_Model.pointer(), FFM_Model.pointer()]
 

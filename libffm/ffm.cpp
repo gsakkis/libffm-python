@@ -486,24 +486,30 @@ void ffm_init_model_weights(ffm_model &model) {
     }
 }
 
+void ffm_cleanup_model_weights(ffm_model &model) {
+    if(model.W != nullptr) {
+#ifndef USESSE
+        free(model.W);
+#else
+    #ifdef _WIN32
+        _aligned_free(model.W);
+    #else
+        free(model.W);
+    #endif
+#endif
+        model.W = nullptr;
+    }
+}
+
+
 ffm_model::ffm_model(ffm_int n, ffm_int m, ffm_int k, bool normalization) : n(n), m(m), k(k), normalization(normalization) {
     ffm_init_model_weights(*this);
 }
 
 ffm_model::~ffm_model() {
-    if(W != nullptr) {
-#ifndef USESSE
-        free(W);
-#else
-    #ifdef _WIN32
-        _aligned_free(W);
-    #else
-        free(W);
-    #endif
-#endif
-        W = nullptr;
-    }
+    ffm_cleanup_model_weights(*this);
 }
+
 
 void ffm_read_problem_to_disk(string txt_path, string bin_path) {
 

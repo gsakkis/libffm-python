@@ -42,6 +42,8 @@ struct ffm_parameter {
 
 void ffm_init_model_weights(ffm_model &model);
 
+void ffm_cleanup_model_weights(ffm_model &model);
+
 void ffm_read_problem_to_disk(string txt_path, string bin_path);
 
 void ffm_save_model(ffm_model &model, string path);
