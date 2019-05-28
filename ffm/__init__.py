@@ -1,10 +1,11 @@
-__all__ = ['FFM', 'read_libffm']
+
+__all__ = ['FFMEstimator', 'read_libffm']
 
 import logging
 
 import numpy as np
-from sklearn import metrics
 from sklearn.base import BaseEstimator
+from sklearn.metrics import get_scorer
 
 from ._wrapper import srand, FFM_Model, FFM_Parameters, FFM_Problem
 
@@ -12,10 +13,10 @@ from ._wrapper import srand, FFM_Model, FFM_Parameters, FFM_Problem
 logger = logging.getLogger('ffm')
 
 
-class FFM(BaseEstimator):
+class FFMEstimator(BaseEstimator):
 
     def __init__(self, eta=0.2, lam=0.00002, k=4, normalization=True, nr_iters=10, auto_stop=5,
-                 score='neg_log_loss', nr_threads=1, randomization=True):
+                 scorer='neg_log_loss', nr_threads=1, randomization=True):
         """
         :param eta: learning rate
         :param lam: regularization parameter
@@ -23,10 +24,10 @@ class FFM(BaseEstimator):
         :param normalization: enable/disable instance-wise normalization
         :param nr_iters: number of iterations
         :param auto_stop: early stopping rounds
-        :param score: an sklearn.metrics Scorer, or one of string keys in sklearn.metrics.SCORERS
+        :param scorer: an sklearn.metrics Scorer, or one of string keys in sklearn.metrics.SCORERS
         """
         self.set_params(eta=eta, lam=lam, k=k, normalization=normalization, nr_iters=nr_iters,
-                        auto_stop=auto_stop, score=score, nr_threads=nr_threads,
+                        auto_stop=auto_stop, scorer=scorer, nr_threads=nr_threads,
                         randomization=randomization)
         self._model = None
 
@@ -40,13 +41,15 @@ class FFM(BaseEstimator):
         self._model.to_file(path)
 
     def predict_proba(self, X):
-        problem = FFM_Problem(X) if not isinstance(X, FFM_Problem) else X
-        return self._model.predict_batch(problem)
+        problem = self._get_ffm_problem(X) if not isinstance(X, FFM_Problem) else X
+        pred_true = self._model.predict_batch(problem)
+        return np.c_[1 - pred_true, pred_true]
 
     decision_function = predict_proba
 
     def fit_from_file(self, training_path, validation_path=None):
-        self._model = FFM_Model.train(training_path, validation_path, self._params, self.nr_threads)
+        self._model = FFM_Model.train(training_path, validation_path,
+                                      self._ffm_params, self.nr_threads)
 
     def fit(self, X, y, val_X_y=None):
         """
@@ -54,55 +57,52 @@ class FFM(BaseEstimator):
         :param y: target as a len(X) sequence of values
         :param val_X_y: (X, y) data for validation
         """
-        problem = FFM_Problem(X, y)
-        ffm_params = self._params
         if self.randomization:
             srand(1)
-        self._model = FFM_Model(problem, ffm_params)
-        if val_X_y:
-            val_X_y = (FFM_Problem(val_X_y[0]), val_X_y[1])
+
+        if val_X_y is not None:
+            val_X_y = (self._get_ffm_problem(val_X_y[0]), val_X_y[1])
             logger.info('%-8s%-16s%-16s', 'iter', 'tr_logloss', 'va_score')
         else:
             logger.info('%-8s%-16s', 'iter', 'tr_logloss')
 
-        best_model = FFM_Model(problem, ffm_params)
-        best_va_score = -np.inf
         best_iter = 0
-        auto_stop = self.auto_stop
+        best_va_score = -np.inf
+        problem = self._get_ffm_problem(X, y)
+        ffm_params = self._ffm_params
+        best_model = FFM_Model(problem, ffm_params)
+        self._model = current_model = FFM_Model(problem, ffm_params)
         for i in range(1, self.nr_iters + 1):
-            tr_logloss = self._model.train_iteration(problem, ffm_params, self.nr_threads)
-            if not val_X_y:
+            tr_logloss = current_model.train_iteration(problem, ffm_params, self.nr_threads)
+            if val_X_y is None:
                 logger.info('%-8d%-16.5f', i, tr_logloss)
             else:
-                va_score = self.scorer(self, *val_X_y)
+                va_score = self.score(*val_X_y)
                 logger.info('%-8d%-16.5f%-16.5f', i, tr_logloss, abs(va_score))
-                if auto_stop:
+                if self.auto_stop:
                     if va_score <= best_va_score:
-                        best_model.copy_to(self._model)
-                        if i - best_iter >= auto_stop:
+                        best_model.copy_to(current_model)
+                        if i - best_iter >= self.auto_stop:
                             logger.info('Auto-stop. Use model at %dth iteration', best_iter)
                             break
                     else:
-                        self._model.copy_to(best_model)
+                        current_model.copy_to(best_model)
                         best_va_score = va_score
                         best_iter = i
         return self
 
-    @property
-    def scorer(self):
-        score = self.score
-        if not callable(score):
-            try:
-                return metrics.SCORERS[score]
-            except KeyError:
-                raise ValueError('Unknown score: {}'.format(score))
-        return score
+    def score(self, X, y):
+        return get_scorer(self.scorer)(self, X, y)
 
     @property
-    def _params(self):
+    def _ffm_params(self):
         return FFM_Parameters(eta=self.eta, lam=self.lam, nr_iters=self.nr_iters, k=self.k,
                               normalization=self.normalization, randomization=self.randomization,
                               auto_stop=bool(self.auto_stop))
+
+    @classmethod
+    def _get_ffm_problem(cls, X, y=None):
+        return FFM_Problem(X, y)
 
 
 def read_libffm(path):

@@ -112,7 +112,9 @@ class FFM_Problem(Structure):
         ('m', ctypes.c_int),
     ]
 
-    def __init__(self, X, y=it.repeat(0)):
+    def __init__(self, X, y=None):
+        if y is None:
+            y = it.repeat(0)
         lines = (FFM_Line * len(X))()
         for line, row, label in zip(lines, X, y):
             line.label = label

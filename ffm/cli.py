@@ -1,6 +1,6 @@
 import logging
 from click import group, command, option, argument, echo, File, Path
-from ffm import FFM, read_libffm
+from ffm import FFMEstimator, read_libffm
 
 
 @group(context_settings={
@@ -28,7 +28,7 @@ def cli(log_level):
         help='Path to validation set')
 @option('-a', '--auto-stop', type=int, default=0, metavar='N',
         help='Keep iterating at most <N> times without achieving a better validation score')
-@option('--score', default='neg_log_loss',
+@option('--scorer', default='neg_log_loss',
         help='Metric to use for evaluating performance on validation set. '
              'It can be any predefined sklearn scoring metric '
              '(http://scikit-learn.org/stable/modules/model_evaluation.html)')
@@ -42,13 +42,13 @@ def cli(log_level):
         help='enable/disable binary file generation from training/validation files')
 def train(training_file, validation_file, **kwargs):
     """Train a FFM model"""
-    model = FFM(
+    model = FFMEstimator(
         lam=kwargs['lambda'],
         k=kwargs['factors'],
         eta=kwargs['eta'],
         nr_iters=kwargs['iterations'],
         auto_stop=kwargs['auto_stop'],
-        score=kwargs['score'],
+        scorer=kwargs['scorer'],
         nr_threads=kwargs['threads'],
         normalization=kwargs['norm'],
         randomization=kwargs['rand'],
@@ -68,7 +68,7 @@ def train(training_file, validation_file, **kwargs):
 @argument('output_file', type=File('w'), required=False)
 def predict(test_file, model_file, output_file):
     """Use a trained FFM model to make predictions"""
-    model = FFM().read_model(model_file)
+    model = FFMEstimator().read_model(model_file)
     test_X, test_y = read_libffm(test_file)
     test_score = abs(model.scorer(model, test_X, test_y))
     echo("{} = {:.5g}".format(model.score, test_score))
