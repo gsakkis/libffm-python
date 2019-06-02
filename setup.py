@@ -29,7 +29,7 @@ class BuildLibFFM(build_ext):
 
 setup(
     name='ffm',
-    version='0.0.2',
+    version='0.0.3',
     description='Python wrapper for LibFFM',
     url='https://github.com/gsakkis/libffm-python',
     packages=['ffm'],
