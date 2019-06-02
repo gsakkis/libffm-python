@@ -79,7 +79,7 @@ class FFM_Model(Structure):
         return lib.ffm_train_iteration(problem, self, params, nr_threads)
 
     def predict_batch(self, problem):
-        predictions = np.empty((problem.size,), dtype=np.float32)
+        predictions = np.empty(problem.size)
         lib.ffm_predict_batch(predictions, problem, self)
         return predictions
 
@@ -150,11 +150,11 @@ def setup_lib(lib_path=None):
                                     ctypes.c_char_p, ctypes.c_char_p,
                                     FFM_Parameters, ctypes.c_int]
 
-    lib.ffm_train_iteration.restype = ctypes.c_float
+    lib.ffm_train_iteration.restype = ctypes.c_double
     lib.ffm_train_iteration.argtypes = [FFM_Problem.pointer(), FFM_Model.pointer(),
                                         FFM_Parameters, ctypes.c_int]
 
-    lib.ffm_predict_batch.argtypes = [np.ctypeslib.ndpointer(dtype=np.float32, ndim=1,
+    lib.ffm_predict_batch.argtypes = [np.ctypeslib.ndpointer(dtype=np.float64, ndim=1,
                                                              flags='C_CONTIGUOUS'),
                                       FFM_Problem.pointer(), FFM_Model.pointer()]
 

@@ -40,9 +40,9 @@ void ffm_copy_model(ffm_model &src, ffm_model &dest);
 
 ffm_model ffm_train_model(char *tr_path, char *tr_bin_path, char *va_path, char *va_bin_path, ffm_parameter params, int nr_threads);
 
-ffm_float ffm_train_iteration(ffm_problem &data, ffm_model &model, ffm_parameter params, int nr_threads);
+ffm_double ffm_train_iteration(ffm_problem &data, ffm_model &model, ffm_parameter params, int nr_threads);
 
-void ffm_predict_batch(ffm_float *result, ffm_problem &data, ffm_model &model);
+void ffm_predict_batch(ffm_double *result, ffm_problem &data, ffm_model &model);
 
 } // namespace ffm
 }

@@ -96,7 +96,7 @@ ffm_model ffm_train_model(char* tr_path, char *tr_bin_path, char *va_path, char 
     return ffm_train_on_disk(tr_bin_path, va_bin_path_str, params);
 }
 
-ffm_float ffm_train_iteration(ffm_problem& prob, ffm_model& model, ffm_parameter params, int nr_threads) {
+ffm_double ffm_train_iteration(ffm_problem& prob, ffm_model& model, ffm_parameter params, int nr_threads) {
     ffm_double loss = 0;
 
     ffm_int len = prob.size;
@@ -139,7 +139,7 @@ ffm_float ffm_train_iteration(ffm_problem& prob, ffm_model& model, ffm_parameter
     return loss / len;
 }
 
-void ffm_predict_batch(ffm_float* result, ffm_problem& prob, ffm_model& model) {
+void ffm_predict_batch(ffm_double* result, ffm_problem& prob, ffm_model& model) {
     ffm_node* X = prob.data;
     ffm_float* R = prob.scales;
     ffm_long* P = prob.pos;
@@ -149,7 +149,7 @@ void ffm_predict_batch(ffm_float* result, ffm_problem& prob, ffm_model& model) {
         ffm_node *end = &X[P[i + 1]];
 
         ffm_float r = model.normalization ? R[i] : 1.0;
-        ffm_float t = wTx(begin, end, r, model);
+        ffm_double t = wTx(begin, end, r, model);
 
         result[i] = 1 / (1 + exp(-t));
     }
